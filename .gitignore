@@ -1,0 +1,46 @@
+# ── Environment & Secrets ───────────────────────────────────────────────────
+.env
+*.env.local
+
+# ── Data (raw data tidak di-push ke repo) ───────────────────────────────────
+data/raw/
+data/staging/
+data/mart/*.duckdb
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ── Model artifacts (model besar → simpan di cloud/release) ─────────────────
+ml/models/*.pkl
+ml/models/*.joblib
+ml/models/*.h5
+
+# ── Docker ───────────────────────────────────────────────────────────────────
+.docker/
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log

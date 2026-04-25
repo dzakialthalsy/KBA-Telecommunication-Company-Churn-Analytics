@@ -1,0 +1,21 @@
+# ── Core Data ──────────────────────────────────────────────────────────────
+pandas==2.2.2
+numpy==1.26.4
+duckdb==0.10.3
+
+# ── ETL & Data Quality ─────────────────────────────────────────────────────
+great-expectations==0.18.15
+sqlalchemy==2.0.30
+
+# ── Machine Learning ───────────────────────────────────────────────────────
+# NOTE: Model training dilakukan di Google Colab, bukan di Docker.
+# Package ini tetap ada di Docker untuk scoring/inference di ETL pipeline (DE-09).
+scikit-learn==1.4.2
+imbalanced-learn==0.12.3
+joblib==1.4.2
+
+# ── Utilities ──────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+loguru==0.7.2
+tqdm==4.66.4
+pyyaml==6.0.1
