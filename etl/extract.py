@@ -1,13 +1,4 @@
-"""
-ETL — Extract Layer
-Task: DE-07 | Owner: Dhea Akmalia Fibri
-
-Tanggung jawab:
-- Baca CSV dari data/raw/
-- Validasi schema (kolom wajib, tipe data)
-- Type casting dasar
-- Logging error dan anomali
-"""
+"""ETL Extract Layer — Task DE-07 | Owner: Dhea Akmalia Fibri."""
 
 import pandas as pd
 from pathlib import Path
@@ -23,7 +14,7 @@ REQUIRED_COLUMNS = [
 
 
 def run_extract(raw_path: Path) -> pd.DataFrame:
-    """Ekstrak CSV ke staging DataFrame dengan validasi awal."""
+    """Ekstrak CSV ke staging DataFrame dengan validasi schema awal."""
     logger.debug(f"Membaca: {raw_path}")
     df = pd.read_csv(raw_path, low_memory=False)
     logger.debug(f"Shape awal: {df.shape}")
