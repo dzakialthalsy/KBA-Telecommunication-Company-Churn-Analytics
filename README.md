@@ -1,6 +1,6 @@
 # 📡 Telco Churn Analytics — Kelompok 4
 
-> **Kecerdasan Bisnis dan Analitik**  
+> **Kecerdasan Bisnis dan Analitik**
 > Strategi Peningkatan Retensi Pelanggan Telekomunikasi melalui Sistem Analitik Loyalitas dan Prediksi Churn
 
 ## 👥 Anggota Tim
@@ -12,121 +12,110 @@
 | Dhea Akmalia Fibri | 245150407111081 | BI / Data Engineer |
 | Fairuz El Fauzy | 245150407111032 | ML Engineer & QA |
 
+---
+
+## 🏗️ Arsitektur: Medallion (Bronze → Silver → Gold)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    MEDALLION ARCHITECTURE                        │
+├──────────────┬──────────────────────┬───────────────────────────┤
+│   🥉 BRONZE  │     🥈 SILVER        │        🥇 GOLD            │
+│  Raw Layer   │   Cleaned Layer      │   Business Layer          │
+├──────────────┼──────────────────────┼───────────────────────────┤
+│ • Data masuk │ • Cleaning &         │ • Agregasi KPI bisnis     │
+│   apa adanya │   standardisasi      │ • Segmentasi pelanggan    │
+│ • +metadata  │ • Feature eng.       │ • Churn risk per customer │
+│ • Append-only│ • Deduplication      │ • Executive summary       │
+│              │ • Type casting       │ • Dikonsumsi Metabase     │
+├──────────────┼──────────────────────┼───────────────────────────┤
+│bronze_       │silver_               │gold_customer_segments     │
+│telecom_raw   │telecom_cleaned       │gold_churn_risk            │
+│              │                      │gold_churn_summary         │
+└──────────────┴──────────────────────┴───────────────────────────┘
+         Semua layer tersimpan dalam: data/gold/telco_warehouse.duckdb
+```
+
 ## 🗂️ Struktur Folder
 
 ```
 telco-churn-analytics/
 │
 ├── data/
-│   ├── raw/            # Dataset asli dari Kaggle (CSV) — jangan dimodifikasi
-│   ├── staging/        # Hasil ekstraksi & validasi awal (ETL layer 1)
-│   └── mart/           # DuckDB warehouse: telco_warehouse.duckdb
+│   ├── raw/        # Dataset CSV asli Kaggle — jangan dimodifikasi
+│   ├── bronze/     # Placeholder (data Bronze ada di DuckDB)
+│   ├── silver/     # Placeholder (data Silver ada di DuckDB)
+│   └── gold/       # telco_warehouse.duckdb — semua layer tersimpan di sini
 │
-├── etl/                # ETL pipeline (Python): extract → transform → load ke DuckDB
+├── etl/
+│   ├── layers/
+│   │   ├── bronze.py   # DE-07: Raw ingestion + metadata
+│   │   ├── silver.py   # DE-08: Cleaning, feature engineering
+│   │   └── gold.py     # DE-09: Business aggregates, mart
+│   └── run_pipeline.py # Entry point: python etl/run_pipeline.py
+│
 ├── ml/
-│   ├── colab/          # Notebooks .ipynb untuk Google Colab (EDA, training, evaluasi)
-│   ├── models/         # Model tersimpan (.joblib) — hasil export dari Colab
-│   └── reports/        # Laporan evaluasi model (CSV, PNG)
+│   ├── colab/          # Notebooks Google Colab (EDA, training, evaluasi)
+│   ├── models/
+│   │   ├── best_model.joblib   # Model terbaik (export dari Colab)
+│   │   └── churn_scores.csv    # Output skor per pelanggan → dipakai Gold
+│   └── reports/        # CSV evaluasi model (AUC-ROC, F1, dll)
 │
 ├── dashboard/          # Query & konfigurasi Metabase
-├── docs/               # PRD, data dictionary, SOP, user guide
-├── scripts/            # Utility: health_check.py
-├── tests/              # Unit tests ETL pipeline
+├── docs/               # PRD, PM signoff, data dictionary, SOP
+├── scripts/
+│   └── health_check.py # Cek kesiapan environment sebelum run
+├── tests/              # Unit tests pipeline
 │
-├── docker-compose.yml  # 2 service: etl + metabase
-├── Dockerfile          # Image Python 3.11 untuk ETL
-├── requirements.txt    # Dependensi Python (ETL & inference)
-└── .env.example        # Template environment variables
-```
-
-## 🏗️ Arsitektur Sistem
-
-```
-[Kaggle CSV]
-     │
-     ▼
-[Docker: ETL Service]  ←── Python: extract.py → transform.py → load.py
-     │
-     ▼
-[DuckDB File]  ←── data/mart/telco_warehouse.duckdb  (mount ke Metabase)
-     │
-     ▼
-[Docker: Metabase]  ←── Dashboard interaktif → http://localhost:3000
-
-[Google Colab]  ←── EDA + Model Training (Fairuz) → export best_model.joblib
-     │
-     └──► ml/models/best_model.joblib  (dipakai ETL untuk scoring)
+├── docker-compose.yml  # 2 services: etl + metabase
+├── Dockerfile
+├── requirements.txt
+└── .env.example
 ```
 
 ## 🚀 Quick Start
 
-### 1. Clone repo & setup .env
-
 ```bash
+# 1. Setup
 git clone https://github.com/<username>/telco-churn-analytics.git
 cd telco-churn-analytics
 cp .env.example .env
-```
 
-### 2. Letakkan dataset
+# 2. Letakkan dataset
+# Download: https://www.kaggle.com/datasets/abhinav89/telecom-customer
+# Simpan ke: data/raw/telecom_customer.csv
 
-Download dari: https://www.kaggle.com/datasets/abhinav89/telecom-customer  
-Simpan ke: `data/raw/telecom_customer.csv`
-
-### 3. Cek environment
-
-```bash
+# 3. Cek environment
 python scripts/health_check.py
-```
 
-### 4. Jalankan Docker (ETL + Metabase)
-
-```bash
+# 4. Jalankan Medallion pipeline + Metabase
 docker compose up --build
 ```
 
-| Service | URL | Keterangan |
+| Service | URL | Tabel Gold yang tersedia |
 |---|---|---|
-| Metabase | http://localhost:3000 | Dashboard & visualisasi |
+| Metabase | http://localhost:3000 | gold_churn_risk, gold_customer_segments, gold_churn_summary |
 
-### 5. Jalankan ETL saja (tanpa Metabase)
+## 🔗 Integrasi ML → Gold Layer
 
-```bash
-docker compose run --rm etl
+Setelah Fairuz selesai training di Google Colab (ML-10):
+
+```python
+# Di Colab — export skor per pelanggan
+scores_df = pd.DataFrame({
+    "customer_id":    test_ids,
+    "ml_churn_score": model.predict_proba(X_test)[:, 1],
+    "ml_churn_label": model.predict(X_test)
+})
+scores_df.to_csv("churn_scores.csv", index=False)
 ```
 
-### 6. ML Training → Google Colab
+Simpan `churn_scores.csv` ke `ml/models/` → jalankan ulang ETL → Gold layer otomatis pakai ML score.
 
-Buka notebook di folder `ml/colab/` → upload ke Google Colab → jalankan.  
-Export model `.joblib` → simpan ke `ml/models/`.
+## 📊 Tabel Gold & KPI
 
-## 📊 KPI Utama
-
-| KPI | Target |
-|---|---|
-| Churn Rate | Terpantau real-time di dashboard |
-| Retention Rate | ≥ 75% |
-| AUC-ROC Model | ≥ 0.75 |
-| Akurasi Model | ≥ 80% |
-| ETL Refresh Time | < 2 jam |
-
-## 🛠️ Tech Stack
-
-| Layer | Tools |
-|---|---|
-| ETL Pipeline | Python 3.11, pandas, DuckDB |
-| Data Warehouse | DuckDB (file-based, mount via Docker volume) |
-| ML Training | Google Colab, scikit-learn, imbalanced-learn |
-| Dashboard | Metabase (Docker) |
-| Containerisasi | Docker & Docker Compose |
-
-## 📁 Konvensi Branch Git
-
-```
-main          → production-ready
-develop       → integrasi semua fitur
-feature/DE-xx → task Data Engineer (Dhea)
-feature/ML-xx → task ML Engineer (Fairuz)
-feature/BA-xx → task Analyst (Rifa)
-docs/PM-xx    → dokumentasi PM (Dzaki)
-```
+| Tabel | Dikonsumsi oleh | KPI |
+|---|---|---|
+| `gold_churn_summary` | Executive Overview | Churn Rate, Retention Rate, ARPU |
+| `gold_customer_segments` | At-Risk Board | Segmen: High Value / At-Risk / Watch / Stable / Churned |
+| `gold_churn_risk` | Drill-Down + ML eval | ml_churn_score, risk_level, reason codes |

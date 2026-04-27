@@ -2,57 +2,45 @@ version: "3.9"
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Telco Churn Analytics — Docker Compose
-#  Kelompok 4 | Kecerdasan Bisnis dan Analitik
-#
-#  Services:
-#    1. etl      — ETL pipeline Python → DuckDB (file-based, no separate service)
-#    2. metabase — Dashboard & visualisasi (baca dari file DuckDB)
-#
-#  NOTE: DuckDB adalah file-based database (seperti SQLite).
-#        Tidak perlu service tersendiri — cukup mount volume ke folder data/mart/
+#  Arsitektur: Medallion (Bronze → Silver → Gold)
+#  Services: etl, metabase
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
 
-  # ── 1. ETL Pipeline ──────────────────────────────────────────────────────
-  #  Tugas: baca CSV → transform → tulis ke data/mart/telco_warehouse.duckdb
-  #  Owner task: Dhea (DE-07, DE-08, DE-09)
-  #  Run manual: docker compose run --rm etl
+  # ── ETL Pipeline (Medallion: Bronze → Silver → Gold) ─────────────────────
   etl:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: telco_etl
     volumes:
-      - ./data:/app/data        # mount seluruh folder data (raw, staging, mart)
-      - ./etl:/app/etl          # mount ETL scripts agar live-edit tanpa rebuild
+      - ./data:/app/data          # Bronze: data/raw/, Gold: data/gold/*.duckdb
+      - ./etl:/app/etl
+      - ./ml:/app/ml              # baca ML scores dari ml/models/churn_scores.csv
       - ./scripts:/app/scripts
     env_file:
       - .env
     environment:
       - PYTHONPATH=/app
-      - DUCKDB_PATH=/app/data/mart/telco_warehouse.duckdb
+      - DUCKDB_PATH=/app/data/gold/telco_warehouse.duckdb
+      - ML_SCORES_PATH=/app/ml/models/churn_scores.csv
     command: python etl/run_pipeline.py
     networks:
       - telco_net
 
-  # ── 2. Metabase (Dashboard) ───────────────────────────────────────────────
-  #  Tugas: visualisasi KPI, churn risk board, drill-down
-  #  Owner task: Dhea (DE-10, DE-11, DE-12)
-  #  Akses: http://localhost:3000
-  #
-  #  Cara koneksi Metabase ke DuckDB:
-  #    - Install DuckDB driver di Metabase (Settings → Database → Add Database)
-  #    - Pilih tipe: DuckDB
-  #    - Path file: /metabase-duckdb/telco_warehouse.duckdb
+  # ── Metabase (baca dari Gold layer DuckDB) ────────────────────────────────
+  # Akses: http://localhost:3000
+  # Koneksi: Add Database → DuckDB → /metabase-gold/telco_warehouse.duckdb
+  # Tabel tersedia: gold_churn_risk, gold_customer_segments, gold_churn_summary
   metabase:
     image: metabase/metabase:v0.49.9
     container_name: telco_metabase
     ports:
       - "3000:3000"
     volumes:
-      - metabase_data:/metabase-data                        # metadata Metabase
-      - ./data/mart:/metabase-duckdb:ro                     # DuckDB file (read-only)
+      - metabase_data:/metabase-data
+      - ./data/gold:/metabase-gold:ro    # Gold layer (read-only untuk Metabase)
     environment:
       - MB_DB_TYPE=h2
       - MB_DB_FILE=/metabase-data/metabase.db
@@ -63,11 +51,9 @@ services:
       - telco_net
     restart: unless-stopped
 
-# ── Volumes ───────────────────────────────────────────────────────────────
 volumes:
-  metabase_data:      # persistent storage untuk konfigurasi Metabase
+  metabase_data:
 
-# ── Networks ──────────────────────────────────────────────────────────────
 networks:
   telco_net:
     driver: bridge
