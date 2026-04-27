@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ═══════════════════════════════════════════════════════════════════════════
 #  Telco Churn Analytics — Docker Compose
 #  Arsitektur: Medallion (Bronze → Silver → Gold)
@@ -7,7 +5,6 @@ version: "3.9"
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
-
   # ── ETL Pipeline (Medallion: Bronze → Silver → Gold) ─────────────────────
   etl:
     build:
@@ -15,9 +12,9 @@ services:
       dockerfile: Dockerfile
     container_name: telco_etl
     volumes:
-      - ./data:/app/data          # Bronze: data/raw/, Gold: data/gold/*.duckdb
+      - ./data:/app/data
       - ./etl:/app/etl
-      - ./ml:/app/ml              # baca ML scores dari ml/models/churn_scores.csv
+      - ./ml:/app/ml
       - ./scripts:/app/scripts
     env_file:
       - .env
@@ -34,17 +31,20 @@ services:
   # Koneksi: Add Database → DuckDB → /metabase-gold/telco_warehouse.duckdb
   # Tabel tersedia: gold_churn_risk, gold_customer_segments, gold_churn_summary
   metabase:
-    image: metabase/metabase:v0.49.9
+    build:
+      context: .
+      dockerfile: Dockerfile.metabase # custom image: Metabase + libstdc++ + DuckDB driver
     container_name: telco_metabase
     ports:
       - "3000:3000"
     volumes:
       - metabase_data:/metabase-data
-      - ./data/gold:/metabase-gold:ro    # Gold layer (read-only untuk Metabase)
+      - ./data/gold:/metabase-gold # Gold layer DuckDB
     environment:
       - MB_DB_TYPE=h2
       - MB_DB_FILE=/metabase-data/metabase.db
       - JAVA_TIMEZONE=Asia/Jakarta
+      - MB_PLUGINS_DIR=/plugins # folder driver DuckDB di dalam container
     depends_on:
       - etl
     networks:
