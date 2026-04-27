@@ -1,13 +1,24 @@
-# ── Environment & Secrets ───────────────────────────────────────────────────
+# ── Environment & Secrets ────────────────────────────────────────────────────
 .env
 *.env.local
 
-# ── Data (raw data tidak di-push ke repo) ───────────────────────────────────
+# ── Data — Medallion Architecture ────────────────────────────────────────────
+# Raw dataset (unduh sendiri dari Kaggle, jangan di-push)
 data/raw/
-data/staging/
-data/mart/*.duckdb
 
-# ── Python ──────────────────────────────────────────────────────────────────
+# Bronze, Silver, Gold: data ada di dalam DuckDB, bukan di folder ini
+# Folder hanya berisi .gitkeep — tetap di-track
+# data/bronze/   ← jangan ignore (hanya berisi .gitkeep)
+# data/silver/   ← jangan ignore (hanya berisi .gitkeep)
+# data/gold/     ← jangan ignore (hanya berisi .gitkeep)
+
+# File DuckDB (bisa besar, dibuat ulang dengan jalankan ETL)
+data/gold/*.duckdb
+
+# Output ML scores dari Google Colab (dibuat ulang dari model)
+ml/models/churn_scores.csv
+
+# ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
@@ -18,29 +29,26 @@ build/
 .eggs/
 *.egg
 
-# ── Jupyter ──────────────────────────────────────────────────────────────────
-.ipynb_checkpoints/
-*.ipynb_checkpoints
-
-# ── Model artifacts (model besar → simpan di cloud/release) ─────────────────
+# ── Model Artifacts ───────────────────────────────────────────────────────────
+# Model besar → simpan di GitHub Release atau cloud storage
 ml/models/*.pkl
 ml/models/*.joblib
 ml/models/*.h5
 
-# ── Docker ───────────────────────────────────────────────────────────────────
+# ── Docker ────────────────────────────────────────────────────────────────────
 .docker/
 
-# ── OS ───────────────────────────────────────────────────────────────────────
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
 
-# ── IDE ──────────────────────────────────────────────────────────────────────
+# ── IDE ───────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.code-workspace
 
-# ── Logs ─────────────────────────────────────────────────────────────────────
+# ── Logs ──────────────────────────────────────────────────────────────────────
 logs/
 *.log
