@@ -1,0 +1,9 @@
+# Paksa semua file sh selalu pakai LF (Linux line endings)
+*.sh text eol=lf
+
+# File teks lain ikut setting git
+*.py text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.env text eol=lf
