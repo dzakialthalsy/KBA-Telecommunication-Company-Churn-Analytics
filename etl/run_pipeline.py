@@ -81,7 +81,7 @@ def main():
     readonly_path = DUCKDB_PATH.parent / "telco_warehouse_readonly.duckdb"
     shutil.copy2(str(DUCKDB_PATH), str(readonly_path))
     logger.info(f"  📋 Read-only copy → {readonly_path}")
-    
+
     logger.info("=" * 60)
 
 

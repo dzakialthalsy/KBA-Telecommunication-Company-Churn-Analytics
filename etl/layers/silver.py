@@ -11,7 +11,6 @@ Prinsip Medallion Silver:
 
 import duckdb
 import pandas as pd
-import numpy as np
 from pathlib import Path
 from loguru import logger
 from sklearn.impute import SimpleImputer
