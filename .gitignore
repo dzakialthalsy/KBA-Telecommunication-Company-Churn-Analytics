@@ -2,10 +2,6 @@
 .env
 *.env.local
 
-# ── Data — Medallion Architecture ────────────────────────────────────────────
-# Raw dataset (unduh sendiri dari Kaggle, jangan di-push)
-data/raw/
-
 # Bronze, Silver, Gold: data ada di dalam DuckDB, bukan di folder ini
 # Folder hanya berisi .gitkeep — tetap di-track
 # data/bronze/   ← jangan ignore (hanya berisi .gitkeep)
