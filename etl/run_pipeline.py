@@ -75,6 +75,13 @@ def main():
     for tbl, cnt in gold_results.items():
         logger.info(f"  🥇 Gold   : {cnt:>10,} baris  ({tbl})")
     logger.info(f"  📦 DuckDB : {DUCKDB_PATH}")
+
+    # ── Buat copy read-only untuk Metabase ───────────────────────────────────
+    import shutil
+    readonly_path = DUCKDB_PATH.parent / "telco_warehouse_readonly.duckdb"
+    shutil.copy2(str(DUCKDB_PATH), str(readonly_path))
+    logger.info(f"  📋 Read-only copy → {readonly_path}")
+    
     logger.info("=" * 60)
 
 

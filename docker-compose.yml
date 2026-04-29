@@ -22,7 +22,7 @@ services:
       - PYTHONPATH=/app
       - DUCKDB_PATH=/app/data/gold/telco_warehouse.duckdb
       - ML_SCORES_PATH=/app/ml/models/churn_scores.csv
-    command: python etl/run_pipeline.py
+    command: bash scripts/entrypoint.sh # ← pastikan ini ada
     networks:
       - telco_net
 
@@ -33,20 +33,21 @@ services:
   metabase:
     build:
       context: .
-      dockerfile: Dockerfile.metabase # custom image: Metabase + libstdc++ + DuckDB driver
+      dockerfile: Dockerfile.metabase
     container_name: telco_metabase
     ports:
       - "3000:3000"
     volumes:
       - metabase_data:/metabase-data
-      - ./data/gold:/metabase-gold # Gold layer DuckDB
+      - ./data/gold:/metabase-gold
     environment:
       - MB_DB_TYPE=h2
       - MB_DB_FILE=/metabase-data/metabase.db
       - JAVA_TIMEZONE=Asia/Jakarta
-      - MB_PLUGINS_DIR=/plugins # folder driver DuckDB di dalam container
+      - MB_PLUGINS_DIR=/plugins
     depends_on:
-      - etl
+      etl:
+        condition: service_completed_successfully
     networks:
       - telco_net
     restart: unless-stopped
