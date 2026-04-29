@@ -77,18 +77,14 @@ telco-churn-analytics/
 
 ```bash
 # 1. Setup
-git clone https://github.com/<username>/telco-churn-analytics.git
-cd telco-churn-analytics
+git clone https://github.com/dzakialthalsy/KBA-Telecommunication-Company-Churn-Analytics.git
+cd KBA-Telecommunication-Company-Churn-Analytics
 cp .env.example .env
 
-# 2. Letakkan dataset
-# Download: https://www.kaggle.com/datasets/abhinav89/telecom-customer
-# Simpan ke: data/raw/telecom_customer.csv
-
-# 3. Cek environment
+# 2. Cek environment
 python scripts/health_check.py
 
-# 4. Jalankan Medallion pipeline + Metabase
+# 3. Jalankan Medallion pipeline + Metabase
 docker compose up --build
 ```
 
