@@ -98,7 +98,7 @@ def _build_customer_segments(df: pd.DataFrame) -> pd.DataFrame:
         "churn", "avgrev", "change_rev",
         "custcare_Mean", "drop_vce_Mean",
         "fe_high_care_call", "fe_revenue_drop",
-        "fe_low_usage", "fe_churn_risk_rule",
+        "fe_low_usage", "fe_drop_call_flag", "fe_churn_risk_rule",
         "customer_segment", "segment_updated_at",
     ] if c in df.columns]
 

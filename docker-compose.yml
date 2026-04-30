@@ -1,11 +1,26 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  Telco Churn Analytics — Docker Compose
-#  Arsitektur: Medallion (Bronze → Silver → Gold)
-#  Services: etl, metabase
+#  Arsitektur: Medallion + RBAC via PostgreSQL Katalog & DuckDB Views
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
-  # ── ETL Pipeline (Medallion: Bronze → Silver → Gold) ─────────────────────
+  # ── Database Katalog (Pusat Kendali RBAC) ──────────────────────────────
+  catalog_db:
+    image: postgres:15
+    container_name: telco_catalog
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=ducklake_catalog
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d ducklake_catalog"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - telco_net
+
+  # ── ETL Pipeline (Bronze → Silver → Gold + Setup RBAC Views) ───────────
   etl:
     build:
       context: .
@@ -22,14 +37,16 @@ services:
       - PYTHONPATH=/app
       - DUCKDB_PATH=/app/data/gold/telco_warehouse.duckdb
       - ML_SCORES_PATH=/app/ml/models/churn_scores.csv
-    command: bash scripts/entrypoint.sh # ← pastikan ini ada
+      - CATALOG_URL=postgresql://admin:password123@catalog_db:5432/ducklake_catalog
+    depends_on:
+      catalog_db:
+        condition: service_healthy
     networks:
       - telco_net
 
-  # ── Metabase (baca dari Gold layer DuckDB) ────────────────────────────────
+  # ── Metabase (Dashboard & Visualisasi) ─────────────────────────────────
   # Akses: http://localhost:3000
-  # Koneksi: Add Database → DuckDB → /metabase-gold/telco_warehouse.duckdb
-  # Tabel tersedia: gold_churn_risk, gold_customer_segments, gold_churn_summary
+  # Koneksi DuckDB: /metabase-gold/telco_warehouse_readonly.duckdb
   metabase:
     build:
       context: .
@@ -44,7 +61,7 @@ services:
       - MB_DB_TYPE=h2
       - MB_DB_FILE=/metabase-data/metabase.db
       - JAVA_TIMEZONE=Asia/Jakarta
-      - MB_PLUGINS_DIR=/plugins
+      - MB_PLUGINS_DIR=/plugins # ← wajib ada agar DuckDB driver diload
     depends_on:
       etl:
         condition: service_completed_successfully

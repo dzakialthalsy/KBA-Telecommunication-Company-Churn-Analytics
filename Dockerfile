@@ -17,6 +17,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
-RUN mkdir -p data/raw data/staging data/mart ml/models ml/reports
+RUN mkdir -p data/raw data/staging data/gold ml/models ml/reports
 
-CMD ["python", "etl/run_pipeline.py"]
+# Berikan permission execute pada entrypoint
+RUN chmod +x /app/scripts/entrypoint.sh
+
+# Gunakan CMD (bukan ENTRYPOINT) agar docker-compose tidak konflik
+CMD ["/app/scripts/entrypoint.sh"]
