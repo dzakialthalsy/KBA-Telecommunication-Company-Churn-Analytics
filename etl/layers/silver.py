@@ -15,8 +15,9 @@ from pathlib import Path
 from loguru import logger
 from sklearn.impute import SimpleImputer
 
-BRONZE_TABLE = "bronze_telecom_raw"
-SILVER_TABLE = "silver_telecom_cleaned"
+BRONZE_TABLE = "bronze.telecom_raw"
+SILVER_SCHEMA = "silver"
+SILVER_TABLE = f"{SILVER_SCHEMA}.telecom_cleaned"
 
 # ── Kolom yang di-drop (missing > 20% atau tidak relevan bisnis) ──────────
 COLUMNS_TO_DROP = [
@@ -66,6 +67,8 @@ def load_to_silver(duckdb_path: Path) -> int:
     """
     logger.info("[SILVER] Membaca Bronze layer ...")
     con = duckdb.connect(str(duckdb_path))
+    con.execute(f"CREATE SCHEMA IF NOT EXISTS {SILVER_SCHEMA}")
+    con.execute("DROP TABLE IF EXISTS silver_telecom_cleaned")
     df = con.execute(f"SELECT * FROM {BRONZE_TABLE}").df()
     logger.info(f"[SILVER] {len(df):,} baris dari Bronze")
 

@@ -70,8 +70,8 @@ def main():
     logger.info("")
     logger.info("=" * 60)
     logger.success("  PIPELINE SELESAI — Medallion Summary:")
-    logger.info(f"  🥉 Bronze : {bronze_count:>10,} baris  (bronze_telecom_raw)")
-    logger.info(f"  🥈 Silver : {silver_count:>10,} baris  (silver_telecom_cleaned)")
+    logger.info(f"  🥉 Bronze : {bronze_count:>10,} baris  (bronze.telecom_raw)")
+    logger.info(f"  🥈 Silver : {silver_count:>10,} baris  (silver.telecom_cleaned)")
     for tbl, cnt in gold_results.items():
         logger.info(f"  🥇 Gold   : {cnt:>10,} baris  ({tbl})")
     logger.info(f"  📦 DuckDB : {DUCKDB_PATH}")

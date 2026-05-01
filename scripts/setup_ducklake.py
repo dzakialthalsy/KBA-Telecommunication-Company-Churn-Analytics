@@ -18,8 +18,8 @@ from loguru import logger
 
 def _existing_columns(con, table_name):
     """Ambil daftar kolom aktual dari tabel/view DuckDB."""
-    rows = con.execute(f"PRAGMA table_info('{table_name}')").fetchall()
-    return {row[1] for row in rows}
+    rows = con.execute(f"DESCRIBE {table_name}").fetchall()
+    return {row[0] for row in rows}
 
 
 def _select_existing(columns, available_columns, alias):
@@ -90,7 +90,7 @@ def create_rbac_views():
     db_path = os.getenv("DUCKDB_PATH")
     logger.info("[RBAC] Membuat DuckDB views per role ...")
     con = duckdb.connect(db_path)
-    segment_columns = _existing_columns(con, "gold_customer_segments")
+    segment_columns = _existing_columns(con, "gold.customer_segments")
 
     # ── VIEW: Executive ───────────────────────────────────────────────────
     # Hanya KPI agregat — tidak ada data individual pelanggan
@@ -106,7 +106,7 @@ def create_rbac_views():
             at_risk_customers,
             avg_revenue_arpu,
             avg_revenue_change
-        FROM gold_churn_summary
+        FROM gold.churn_summary
     """)
     logger.info("[RBAC] view_executive dibuat ✓")
 
@@ -135,8 +135,8 @@ def create_rbac_views():
             r.ml_churn_label,
             r.risk_updated_at{',' if operational_segment_columns else ''}
 {operational_segment_columns}
-        FROM gold_churn_risk r
-        LEFT JOIN gold_customer_segments s
+        FROM gold.churn_risk r
+        LEFT JOIN gold.customer_segments s
             ON r.Customer_ID = s.Customer_ID
     """)
     logger.info("[RBAC] view_operational dibuat ✓")
@@ -164,8 +164,8 @@ def create_rbac_views():
         SELECT
             r.*{',' if analyst_segment_columns else ''}
 {analyst_segment_columns}
-        FROM gold_churn_risk r
-        LEFT JOIN gold_customer_segments s
+        FROM gold.churn_risk r
+        LEFT JOIN gold.customer_segments s
             ON r.Customer_ID = s.Customer_ID
     """)
     logger.info("[RBAC] view_analyst dibuat ✓")

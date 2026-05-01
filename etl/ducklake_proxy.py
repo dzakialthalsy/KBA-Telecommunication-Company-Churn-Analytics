@@ -16,11 +16,11 @@ from loguru import logger
 
 # Mapping role → view yang diizinkan
 ROLE_VIEW_MAP = {
-    "Executive":   ["view_executive", "gold_churn_summary"],
+    "Executive":   ["view_executive", "gold.churn_summary"],
     "Operational": ["view_operational", "view_executive"],
     "Analyst":     ["view_analyst", "view_operational", "view_executive",
-                    "gold_churn_summary", "gold_churn_risk",
-                    "gold_customer_segments", "silver_telecom_cleaned"],
+                    "gold.churn_summary", "gold.churn_risk",
+                    "gold.customer_segments", "silver.telecom_cleaned"],
 }
 
 

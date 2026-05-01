@@ -16,7 +16,8 @@ from pathlib import Path
 from datetime import datetime
 from loguru import logger
 
-BRONZE_TABLE = "bronze_telecom_raw"
+BRONZE_SCHEMA = "bronze"
+BRONZE_TABLE = f"{BRONZE_SCHEMA}.telecom_raw"
 
 
 def load_to_bronze(raw_path: Path, duckdb_path: Path) -> int:
@@ -43,6 +44,8 @@ def load_to_bronze(raw_path: Path, duckdb_path: Path) -> int:
 
     # ── Load ke DuckDB ────────────────────────────────────────────────────
     con = duckdb.connect(str(duckdb_path))
+    con.execute(f"CREATE SCHEMA IF NOT EXISTS {BRONZE_SCHEMA}")
+    con.execute("DROP TABLE IF EXISTS bronze_telecom_raw")
     con.execute(f"DROP TABLE IF EXISTS {BRONZE_TABLE}")
     con.execute(f"CREATE TABLE {BRONZE_TABLE} AS SELECT * FROM df")
 

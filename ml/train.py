@@ -50,7 +50,7 @@ def load_data() -> pd.DataFrame:
             f"DuckDB belum ada: {DUCKDB_PATH}. Jalankan ETL pipeline dulu."
         )
     con = duckdb.connect(str(DUCKDB_PATH), read_only=True)
-    df = con.execute("SELECT * FROM mart_churn_risk").df()
+    df = con.execute("SELECT * FROM gold.mart_churn_risk").df()
     con.close()
     return df
 

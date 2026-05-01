@@ -18,7 +18,11 @@ import numpy as np
 from pathlib import Path
 from loguru import logger
 
-SILVER_TABLE = "silver_telecom_cleaned"
+SILVER_TABLE = "silver.telecom_cleaned"
+GOLD_SCHEMA = "gold"
+GOLD_CUSTOMER_SEGMENTS = f"{GOLD_SCHEMA}.customer_segments"
+GOLD_CHURN_RISK = f"{GOLD_SCHEMA}.churn_risk"
+GOLD_CHURN_SUMMARY = f"{GOLD_SCHEMA}.churn_summary"
 
 # Nama kolom ID di dataset asli Kaggle adalah "Customer_ID" (kapital)
 CUSTOMER_ID_COL = "Customer_ID"
@@ -37,6 +41,10 @@ def load_to_gold(duckdb_path: Path, model_scores_path: Path = None) -> dict:
     """
     logger.info("[GOLD] Membaca Silver layer ...")
     con = duckdb.connect(str(duckdb_path))
+    con.execute(f"CREATE SCHEMA IF NOT EXISTS {GOLD_SCHEMA}")
+    con.execute("DROP TABLE IF EXISTS gold_customer_segments")
+    con.execute("DROP TABLE IF EXISTS gold_churn_risk")
+    con.execute("DROP TABLE IF EXISTS gold_churn_summary")
     df = con.execute(f"SELECT * FROM {SILVER_TABLE}").df()
     logger.info(f"[GOLD] {len(df):,} baris dari Silver")
 
@@ -44,24 +52,24 @@ def load_to_gold(duckdb_path: Path, model_scores_path: Path = None) -> dict:
 
     # ── Tabel 1: gold_customer_segments ──────────────────────────────────
     df_seg = _build_customer_segments(df.copy())
-    con.execute("DROP TABLE IF EXISTS gold_customer_segments")
-    con.execute("CREATE TABLE gold_customer_segments AS SELECT * FROM df_seg")
-    results["gold_customer_segments"] = len(df_seg)
-    logger.success(f"[GOLD] gold_customer_segments: {len(df_seg):,} baris ✓")
+    con.execute(f"DROP TABLE IF EXISTS {GOLD_CUSTOMER_SEGMENTS}")
+    con.execute(f"CREATE TABLE {GOLD_CUSTOMER_SEGMENTS} AS SELECT * FROM df_seg")
+    results[GOLD_CUSTOMER_SEGMENTS] = len(df_seg)
+    logger.success(f"[GOLD] {GOLD_CUSTOMER_SEGMENTS}: {len(df_seg):,} baris ✓")
 
     # ── Tabel 2: gold_churn_risk ──────────────────────────────────────────
     df_risk = _build_churn_risk(df.copy(), model_scores_path)
-    con.execute("DROP TABLE IF EXISTS gold_churn_risk")
-    con.execute("CREATE TABLE gold_churn_risk AS SELECT * FROM df_risk")
-    results["gold_churn_risk"] = len(df_risk)
-    logger.success(f"[GOLD] gold_churn_risk: {len(df_risk):,} baris ✓")
+    con.execute(f"DROP TABLE IF EXISTS {GOLD_CHURN_RISK}")
+    con.execute(f"CREATE TABLE {GOLD_CHURN_RISK} AS SELECT * FROM df_risk")
+    results[GOLD_CHURN_RISK] = len(df_risk)
+    logger.success(f"[GOLD] {GOLD_CHURN_RISK}: {len(df_risk):,} baris ✓")
 
     # ── Tabel 3: gold_churn_summary ───────────────────────────────────────
     df_summary = _build_churn_summary(df_risk.copy())
-    con.execute("DROP TABLE IF EXISTS gold_churn_summary")
-    con.execute("CREATE TABLE gold_churn_summary AS SELECT * FROM df_summary")
-    results["gold_churn_summary"] = len(df_summary)
-    logger.success(f"[GOLD] gold_churn_summary: {len(df_summary):,} baris ✓")
+    con.execute(f"DROP TABLE IF EXISTS {GOLD_CHURN_SUMMARY}")
+    con.execute(f"CREATE TABLE {GOLD_CHURN_SUMMARY} AS SELECT * FROM df_summary")
+    results[GOLD_CHURN_SUMMARY] = len(df_summary)
+    logger.success(f"[GOLD] {GOLD_CHURN_SUMMARY}: {len(df_summary):,} baris ✓")
 
     con.close()
     return results
