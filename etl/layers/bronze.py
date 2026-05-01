@@ -7,7 +7,7 @@ Prinsip Medallion Bronze:
 - TIDAK ada transformasi bisnis, TIDAK ada filtering
 - Hanya tambah metadata: _ingested_at, _source_file, _row_id
 - Append-only: data lama tidak pernah dihapus
-- Disimpan sebagai tabel DuckDB: bronze_telecom_raw
+- Disimpan sebagai tabel DuckDB: bronze.telecom_raw
 """
 
 import duckdb
@@ -45,7 +45,6 @@ def load_to_bronze(raw_path: Path, duckdb_path: Path) -> int:
     # ── Load ke DuckDB ────────────────────────────────────────────────────
     con = duckdb.connect(str(duckdb_path))
     con.execute(f"CREATE SCHEMA IF NOT EXISTS {BRONZE_SCHEMA}")
-    con.execute("DROP TABLE IF EXISTS bronze_telecom_raw")
     con.execute(f"DROP TABLE IF EXISTS {BRONZE_TABLE}")
     con.execute(f"CREATE TABLE {BRONZE_TABLE} AS SELECT * FROM df")
 

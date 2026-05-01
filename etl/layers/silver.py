@@ -6,7 +6,7 @@ Prinsip Medallion Silver:
 - Baca dari Bronze, JANGAN sentuh sumber asli
 - Cleaning sesuai notebook silver_processing.ipynb (Google Colab)
 - JANGAN scaling — scaling hanya di notebook ML (Fairuz)
-- Disimpan sebagai tabel DuckDB: silver_telecom_cleaned
+- Disimpan sebagai tabel DuckDB: silver.telecom_cleaned
 """
 
 import duckdb
@@ -68,7 +68,6 @@ def load_to_silver(duckdb_path: Path) -> int:
     logger.info("[SILVER] Membaca Bronze layer ...")
     con = duckdb.connect(str(duckdb_path))
     con.execute(f"CREATE SCHEMA IF NOT EXISTS {SILVER_SCHEMA}")
-    con.execute("DROP TABLE IF EXISTS silver_telecom_cleaned")
     df = con.execute(f"SELECT * FROM {BRONZE_TABLE}").df()
     logger.info(f"[SILVER] {len(df):,} baris dari Bronze")
 

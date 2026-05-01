@@ -5,11 +5,11 @@ Task: DE-09 | Owner: Dhea Akmalia Fibri
 Prinsip Medallion Gold:
 - Baca dari Silver, JANGAN baca Bronze atau sumber langsung
 - Diagregasi sesuai kebutuhan bisnis & dashboard
-- Dikonsumsi langsung oleh Metabase
+- Dikonsumsi langsung oleh Metabase (schema gold saja yang di-expose)
 - Tabel:
-    gold_customer_segments  → segmentasi pelanggan
-    gold_churn_risk         → skor risiko per pelanggan
-    gold_churn_summary      → KPI agregat untuk Executive
+    gold.customer_segments  → segmentasi pelanggan
+    gold.churn_risk         → skor risiko per pelanggan
+    gold.churn_summary      → KPI agregat untuk Executive
 """
 
 import duckdb
@@ -36,35 +36,32 @@ HIGH_VALUE_AVGREV_PERCENTILE = 0.75
 def load_to_gold(duckdb_path: Path, model_scores_path: Path = None) -> dict:
     """
     Build semua tabel Gold dari Silver.
-    Jika model_scores_path tersedia, gabungkan ML score ke gold_churn_risk.
+    Jika model_scores_path tersedia, gabungkan ML score ke gold.churn_risk.
     Return: dict berisi row count tiap tabel Gold.
     """
     logger.info("[GOLD] Membaca Silver layer ...")
     con = duckdb.connect(str(duckdb_path))
     con.execute(f"CREATE SCHEMA IF NOT EXISTS {GOLD_SCHEMA}")
-    con.execute("DROP TABLE IF EXISTS gold_customer_segments")
-    con.execute("DROP TABLE IF EXISTS gold_churn_risk")
-    con.execute("DROP TABLE IF EXISTS gold_churn_summary")
     df = con.execute(f"SELECT * FROM {SILVER_TABLE}").df()
     logger.info(f"[GOLD] {len(df):,} baris dari Silver")
 
     results = {}
 
-    # ── Tabel 1: gold_customer_segments ──────────────────────────────────
+    # ── Tabel 1: gold.customer_segments ──────────────────────────────────
     df_seg = _build_customer_segments(df.copy())
     con.execute(f"DROP TABLE IF EXISTS {GOLD_CUSTOMER_SEGMENTS}")
     con.execute(f"CREATE TABLE {GOLD_CUSTOMER_SEGMENTS} AS SELECT * FROM df_seg")
     results[GOLD_CUSTOMER_SEGMENTS] = len(df_seg)
     logger.success(f"[GOLD] {GOLD_CUSTOMER_SEGMENTS}: {len(df_seg):,} baris ✓")
 
-    # ── Tabel 2: gold_churn_risk ──────────────────────────────────────────
+    # ── Tabel 2: gold.churn_risk ──────────────────────────────────────────
     df_risk = _build_churn_risk(df.copy(), model_scores_path)
     con.execute(f"DROP TABLE IF EXISTS {GOLD_CHURN_RISK}")
     con.execute(f"CREATE TABLE {GOLD_CHURN_RISK} AS SELECT * FROM df_risk")
     results[GOLD_CHURN_RISK] = len(df_risk)
     logger.success(f"[GOLD] {GOLD_CHURN_RISK}: {len(df_risk):,} baris ✓")
 
-    # ── Tabel 3: gold_churn_summary ───────────────────────────────────────
+    # ── Tabel 3: gold.churn_summary ───────────────────────────────────────
     df_summary = _build_churn_summary(df_risk.copy())
     con.execute(f"DROP TABLE IF EXISTS {GOLD_CHURN_SUMMARY}")
     con.execute(f"CREATE TABLE {GOLD_CHURN_SUMMARY} AS SELECT * FROM df_summary")
@@ -100,7 +97,6 @@ def _build_customer_segments(df: pd.DataFrame) -> pd.DataFrame:
     df["customer_segment"] = df.apply(assign_segment, axis=1)
     df["segment_updated_at"] = pd.Timestamp.now().isoformat()
 
-    # Kolom yang ditampilkan di dashboard — pakai Customer_ID (nama asli dataset)
     keep_cols = [c for c in [
         CUSTOMER_ID_COL,
         "churn", "avgrev", "change_rev",
@@ -120,11 +116,9 @@ def _build_churn_risk(df: pd.DataFrame, model_scores_path: Path = None) -> pd.Da
     Jika belum → pakai fe_churn_risk_rule sebagai fallback.
     """
     if model_scores_path and Path(model_scores_path).exists():
-        logger.info("[GOLD] ML scores ditemukan → merge ke gold_churn_risk")
+        logger.info("[GOLD] ML scores ditemukan → merge ke gold.churn_risk")
         ml_scores = pd.read_csv(model_scores_path)
 
-        # ML scores harus punya Customer_ID (kapital) untuk join
-        # Coba berbagai kemungkinan nama kolom ID dari Fairuz
         id_col_ml = None
         for candidate in ["Customer_ID", "customer_id", "CustomerID"]:
             if candidate in ml_scores.columns:
@@ -140,7 +134,6 @@ def _build_churn_risk(df: pd.DataFrame, model_scores_path: Path = None) -> pd.Da
                 " → pakai rule-based fallback"
             )
         elif CUSTOMER_ID_COL in df.columns:
-            # Standardisasi nama kolom ID di ML scores agar bisa di-join
             ml_scores = ml_scores.rename(columns={id_col_ml: CUSTOMER_ID_COL})
             df = df.merge(
                 ml_scores[[CUSTOMER_ID_COL] + required_score_cols],
