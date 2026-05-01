@@ -172,6 +172,42 @@ def wait_for_metabase(timeout: int = 120):
         logger.info("[METABASE] Masih menunggu Metabase ...")
     raise TimeoutError("Metabase tidak siap dalam waktu yang ditentukan")
 
+def setup_metabase_admin(self):
+    """Setup admin user pertama kali jika Metabase belum diinisialisasi."""
+    # Cek apakah Metabase sudah di-setup
+    resp = requests.get(f"{METABASE_URL}/api/session/properties")
+    props = resp.json()
+    
+    if props.get("setup-token") is None:
+        logger.info("[METABASE] Metabase sudah di-setup sebelumnya, skip.")
+        return
+
+    setup_token = props["setup-token"]
+    logger.info("[METABASE] Metabase belum di-setup, menginisialisasi admin ...")
+
+    payload = {
+        "token": setup_token,
+        "user": {
+            "email":      METABASE_USER,
+            "password":   METABASE_PASS,
+            "first_name": "Admin",
+            "last_name":  "Telco",
+            "site_name":  "Telco Analytics",
+        },
+        "prefs": {
+            "site_name":          "Telco Analytics",
+            "allow_tracking":     False,
+        },
+    }
+
+    resp = requests.post(
+        f"{METABASE_URL}/api/setup",
+        json=payload,
+        headers=self.headers,
+    )
+    resp.raise_for_status()
+    logger.success("[METABASE] Admin berhasil dibuat ✓")
+
 
 def main():
     logger.info("=" * 55)
@@ -179,6 +215,7 @@ def main():
     logger.info("=" * 55)
     wait_for_metabase()
     rbac = MetabaseRBAC()
+    rbac.setup_metabase_admin()   # ← tambahkan ini SEBELUM login
     rbac.login()
     rbac.setup()
     logger.info("=" * 55)
