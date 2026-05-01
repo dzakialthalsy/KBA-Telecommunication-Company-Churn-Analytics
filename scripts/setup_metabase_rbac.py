@@ -18,6 +18,18 @@ RBAC_MAP = {
     "Analyst":     ["churn_summary", "churn_risk", "customer_segments", "telecom_cleaned"],
 }
 
+USERS_MAP = {
+    "Executive": [
+        {"email": "ceo@telco.com", "first_name": "CEO", "last_name": "User", "password": "Exec@1234"},
+    ],
+    "Operational": [
+        {"email": "ops@telco.com", "first_name": "Ops", "last_name": "Manager", "password": "Ops@1234"},
+    ],
+    "Analyst": [
+        {"email": "analyst@telco.com", "first_name": "Data", "last_name": "Analyst", "password": "Analyst@1234"},
+    ],
+}
+
 
 class MetabaseRBAC:
     def __init__(self):
@@ -61,7 +73,6 @@ class MetabaseRBAC:
             headers=self.headers,
         )
 
-        # 403 = user sudah ada, tidak perlu setup ulang
         if resp.status_code == 403:
             logger.info("[METABASE] Admin sudah ada (403), skip setup.")
             return
@@ -91,15 +102,6 @@ class MetabaseRBAC:
         return requests.post(f"{METABASE_URL}{path}", json=data, headers=self.headers)
 
     # ── Database ──────────────────────────────────────────────────────────
-    def get_database_id(self) -> int:
-        resp = self._get("/api/database")
-        resp.raise_for_status()
-        for db in resp.json().get("data", []):
-            if db["name"] == DB_NAME:
-                logger.info(f"[METABASE] Database '{DB_NAME}' ditemukan (id={db['id']})")
-                return db["id"]
-        raise ValueError(f"Database '{DB_NAME}' tidak ditemukan di Metabase")
-
     def get_tables(self, db_id: int) -> dict:
         resp = self._get(f"/api/database/{db_id}/metadata")
         resp.raise_for_status()
@@ -108,6 +110,29 @@ class MetabaseRBAC:
             tables[tbl["name"]] = tbl["id"]
         logger.info(f"[METABASE] Tabel ditemukan: {list(tables.keys())}")
         return tables
+
+    def register_database(self) -> int:
+        """Daftarkan DuckDB ke Metabase jika belum ada."""
+        resp = self._get("/api/database")
+        resp.raise_for_status()
+        for db in resp.json().get("data", []):
+            if db["name"] == DB_NAME:
+                logger.info(f"[METABASE] Database '{DB_NAME}' sudah terdaftar (id={db['id']})")
+                return db["id"]
+
+        logger.info(f"[METABASE] Mendaftarkan database '{DB_NAME}' ...")
+        payload = {
+            "name":   DB_NAME,
+            "engine": "duckdb",
+            "details": {
+                "database_file": "/metabase-gold/telco_warehouse_readonly.duckdb",
+            },
+        }
+        resp = self._post("/api/database", payload)
+        resp.raise_for_status()
+        db_id = resp.json()["id"]
+        logger.success(f"[METABASE] Database '{DB_NAME}' terdaftar (id={db_id}) ✓")
+        return db_id
 
     # ── Groups ────────────────────────────────────────────────────────────
     def get_or_create_group(self, name: str) -> int:
@@ -134,63 +159,75 @@ class MetabaseRBAC:
 
         if group_key not in graph["groups"]:
             graph["groups"][group_key] = {}
-        if db_key not in graph["groups"][group_key]:
-            graph["groups"][group_key][db_key] = {}
 
-        table_permissions = {}
-        for tbl_name, tbl_id in tables.items():
-            if tbl_name in allowed_tables:
-                table_permissions[str(tbl_id)] = {"read": "unrestricted", "query": "unrestricted"}
-            else:
-                table_permissions[str(tbl_id)] = {"read": "none", "query": "none"}
-
+        # Metabase Community: granular per-tabel tidak didukung
+        # Semua group diberi akses unrestricted di level DB
+        # Pembatasan dilakukan via Collections (manual) atau DuckLakeProxy
         graph["groups"][group_key][db_key] = {
-            "view-data": "granular",
-            "create-queries": "granular",
-            "data": {"schemas": {"gold": table_permissions}},
+            "view-data": "unrestricted",
+            "create-queries": "query-builder",
         }
 
         resp = self._put("/api/permissions/graph", graph)
         if resp.status_code == 200:
-            logger.success(
-                f"[METABASE] Permissions group_id={group_id} → allow: {allowed_tables} ✓"
-            )
+            logger.success(f"[METABASE] Permissions group_id={group_id} updated ✓")
         else:
             logger.warning(
                 f"[METABASE] Permissions update gagal: {resp.status_code} {resp.text}"
             )
-    
-    def register_database(self) -> int:
-        """Daftarkan DuckDB ke Metabase jika belum ada."""
-        resp = self._get("/api/database")
-        resp.raise_for_status()
-        for db in resp.json().get("data", []):
-            if db["name"] == DB_NAME:
-                logger.info(f"[METABASE] Database '{DB_NAME}' sudah terdaftar (id={db['id']})")
-                return db["id"]
 
-        logger.info(f"[METABASE] Mendaftarkan database '{DB_NAME}' ...")
-        payload = {
-            "name":   DB_NAME,
-            "engine": "duckdb",
-            "details": {
-                "database_file": "/metabase-gold/telco_warehouse_readonly.duckdb",
-            },
-        }
-        resp = self._post("/api/database", payload)
-        resp.raise_for_status()
-        db_id = resp.json()["id"]
-        logger.success(f"[METABASE] Database '{DB_NAME}' terdaftar (id={db_id}) ✓")
-        return db_id
+    # ── Users ─────────────────────────────────────────────────────────────
+    def create_users_and_assign_groups(self, groups: dict):
+        """Buat user demo dan assign ke group yang sesuai."""
+        for role_name, users in USERS_MAP.items():
+            group_id = groups.get(role_name)
+            if not group_id:
+                continue
+            for user_info in users:
+                # Cek apakah user sudah ada
+                resp = self._get("/api/user")
+                existing = [
+                    u for u in resp.json().get("data", [])
+                    if u["email"] == user_info["email"]
+                ]
 
+                if existing:
+                    user_id = existing[0]["id"]
+                    logger.info(
+                        f"[METABASE] User {user_info['email']} sudah ada (id={user_id})"
+                    )
+                else:
+                    resp = self._post("/api/user", {
+                        "email":      user_info["email"],
+                        "first_name": user_info["first_name"],
+                        "last_name":  user_info["last_name"],
+                        "password":   user_info["password"],
+                    })
+                    if resp.status_code != 200:
+                        logger.warning(
+                            f"[METABASE] Gagal buat user {user_info['email']}: {resp.text}"
+                        )
+                        continue
+                    user_id = resp.json()["id"]
+                    logger.success(
+                        f"[METABASE] User {user_info['email']} dibuat (id={user_id}) ✓"
+                    )
+
+                # Assign ke group (abaikan jika sudah member)
+                self._post("/api/permissions/membership", {
+                    "group_id": group_id,
+                    "user_id":  user_id,
+                })
+                logger.success(
+                    f"[METABASE] {user_info['email']} → group '{role_name}' ✓"
+                )
 
     # ── Main Setup ────────────────────────────────────────────────────────
     def setup(self):
         logger.info("[METABASE] Memulai setup RBAC ...")
 
-        db_id  = self.register_database()   # ← ganti get_database_id() dengan ini
+        db_id = self.register_database()
 
-        # Tunggu sebentar agar Metabase selesai sync tabel setelah registrasi
         logger.info("[METABASE] Menunggu sync tabel selesai ...")
         time.sleep(15)
 
@@ -200,13 +237,23 @@ class MetabaseRBAC:
             time.sleep(20)
             tables = self.get_tables(db_id)
 
+        # Setup groups, permissions, dan users dalam satu loop
+        groups = {}
         for role_name, allowed_tables in RBAC_MAP.items():
             group_id = self.get_or_create_group(role_name)
+            groups[role_name] = group_id
             self.apply_table_permissions(db_id, tables, group_id, allowed_tables)
 
+        self.create_users_and_assign_groups(groups)
+
         logger.success("[METABASE] Setup RBAC selesai ✓")
+        logger.info("[METABASE] Ringkasan akses:")
         for role, tables_allowed in RBAC_MAP.items():
             logger.info(f"[METABASE]   {role:<15} → {tables_allowed}")
+        logger.info("[METABASE] Ringkasan user:")
+        for role, users in USERS_MAP.items():
+            for u in users:
+                logger.info(f"[METABASE]   {u['email']:<30} → {role}")
 
 
 def wait_for_metabase(timeout: int = 300):
