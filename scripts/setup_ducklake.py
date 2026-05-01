@@ -178,15 +178,27 @@ def create_rbac_views():
     logger.info("  view_analyst     → akses penuh semua kolom Gold")
 
 
+import argparse
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--catalog-only", action="store_true")
+    parser.add_argument("--views-only", action="store_true")
+    args = parser.parse_args()
+
     logger.info("=" * 55)
     logger.info("  DuckLake Catalog Setup — RBAC Initialization")
     logger.info("=" * 55)
 
-    init_postgres_catalog()
-    create_rbac_views()
+    if args.catalog_only:
+        init_postgres_catalog()
+    elif args.views_only:
+        create_rbac_views()
+    else:
+        # default: jalankan keduanya (untuk backward compatibility)
+        init_postgres_catalog()
+        create_rbac_views()
 
-    logger.info("=" * 55)
     logger.success("  Setup selesai.")
     logger.info("=" * 55)
 
