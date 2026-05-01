@@ -1,13 +1,5 @@
 """
 Setup Metabase RBAC — Otomatis via Metabase API
-Membuat groups, mengatur permissions per tabel, tanpa perlu klik manual.
-
-RBAC mapping sesuai PRD:
-  Executive   → gold.churn_summary saja
-  Operational → gold.churn_risk, gold.customer_segments
-  Analyst     → semua tabel (termasuk gold.telecom_cleaned)
-
-Dipanggil otomatis dari entrypoint.sh setelah ETL selesai.
 """
 
 import requests
@@ -20,7 +12,6 @@ METABASE_USER = os.getenv("METABASE_USER", "admin@telco.com")
 METABASE_PASS = os.getenv("METABASE_PASS", "admin123")
 DB_NAME       = os.getenv("METABASE_DB_NAME", "Telco Warehouse")
 
-# Mapping group → tabel yang BOLEH diakses (sisanya unrestricted=false)
 RBAC_MAP = {
     "Executive":   ["churn_summary"],
     "Operational": ["churn_risk", "customer_segments"],
@@ -34,6 +25,50 @@ class MetabaseRBAC:
         self.headers = {"Content-Type": "application/json"}
 
     # ── Auth ──────────────────────────────────────────────────────────────
+    def setup_metabase_admin(self):
+        """Setup admin user pertama kali jika Metabase belum diinisialisasi."""
+        resp = requests.get(
+            f"{METABASE_URL}/api/session/properties",
+            headers=self.headers,
+        )
+        props = resp.json()
+
+        setup_token = props.get("setup-token")
+        if not setup_token:
+            logger.info("[METABASE] Metabase sudah di-setup sebelumnya, skip.")
+            return
+
+        logger.info("[METABASE] Metabase belum di-setup, menginisialisasi admin ...")
+
+        payload = {
+            "token": setup_token,
+            "user": {
+                "email":      METABASE_USER,
+                "password":   METABASE_PASS,
+                "first_name": "Admin",
+                "last_name":  "Telco",
+                "site_name":  "Telco Analytics",
+            },
+            "prefs": {
+                "site_name":      "Telco Analytics",
+                "allow_tracking": False,
+            },
+        }
+
+        resp = requests.post(
+            f"{METABASE_URL}/api/setup",
+            json=payload,
+            headers=self.headers,
+        )
+
+        # 403 = user sudah ada, tidak perlu setup ulang
+        if resp.status_code == 403:
+            logger.info("[METABASE] Admin sudah ada (403), skip setup.")
+            return
+
+        resp.raise_for_status()
+        logger.success("[METABASE] Admin berhasil dibuat ✓")
+
     def login(self):
         logger.info(f"[METABASE] Login sebagai {METABASE_USER} ...")
         resp = requests.post(
@@ -57,7 +92,6 @@ class MetabaseRBAC:
 
     # ── Database ──────────────────────────────────────────────────────────
     def get_database_id(self) -> int:
-        """Cari ID database berdasarkan nama."""
         resp = self._get("/api/database")
         resp.raise_for_status()
         for db in resp.json().get("data", []):
@@ -67,7 +101,6 @@ class MetabaseRBAC:
         raise ValueError(f"Database '{DB_NAME}' tidak ditemukan di Metabase")
 
     def get_tables(self, db_id: int) -> dict:
-        """Return dict {nama_tabel: table_id} untuk database ini."""
         resp = self._get(f"/api/database/{db_id}/metadata")
         resp.raise_for_status()
         tables = {}
@@ -78,15 +111,12 @@ class MetabaseRBAC:
 
     # ── Groups ────────────────────────────────────────────────────────────
     def get_or_create_group(self, name: str) -> int:
-        """Cari group by name, buat baru jika belum ada."""
         resp = self._get("/api/permissions/group")
         resp.raise_for_status()
         for group in resp.json():
             if group["name"] == name:
                 logger.info(f"[METABASE] Group '{name}' sudah ada (id={group['id']})")
                 return group["id"]
-
-        # Buat baru
         resp = self._post("/api/permissions/group", {"name": name})
         resp.raise_for_status()
         gid = resp.json()["id"]
@@ -95,12 +125,6 @@ class MetabaseRBAC:
 
     # ── Permissions ───────────────────────────────────────────────────────
     def apply_table_permissions(self, db_id: int, tables: dict, group_id: int, allowed_tables: list):
-        """
-        Set permissions per tabel untuk satu group.
-        Tabel yang ada di allowed_tables → unrestricted (bisa query).
-        Tabel lain → no (tidak bisa lihat sama sekali).
-        """
-        # Ambil permissions graph saat ini
         resp = self._get("/api/permissions/graph")
         resp.raise_for_status()
         graph = resp.json()
@@ -108,13 +132,11 @@ class MetabaseRBAC:
         group_key = str(group_id)
         db_key    = str(db_id)
 
-        # Pastikan struktur graph ada
         if group_key not in graph["groups"]:
             graph["groups"][group_key] = {}
         if db_key not in graph["groups"][group_key]:
             graph["groups"][group_key][db_key] = {}
 
-        # Set view-data per tabel
         table_permissions = {}
         for tbl_name, tbl_id in tables.items():
             if tbl_name in allowed_tables:
@@ -131,33 +153,64 @@ class MetabaseRBAC:
         resp = self._put("/api/permissions/graph", graph)
         if resp.status_code == 200:
             logger.success(
-                f"[METABASE] Permissions group_id={group_id} "
-                f"→ allow: {allowed_tables} ✓"
+                f"[METABASE] Permissions group_id={group_id} → allow: {allowed_tables} ✓"
             )
         else:
             logger.warning(
                 f"[METABASE] Permissions update gagal: {resp.status_code} {resp.text}"
             )
+    
+    def register_database(self) -> int:
+        """Daftarkan DuckDB ke Metabase jika belum ada."""
+        resp = self._get("/api/database")
+        resp.raise_for_status()
+        for db in resp.json().get("data", []):
+            if db["name"] == DB_NAME:
+                logger.info(f"[METABASE] Database '{DB_NAME}' sudah terdaftar (id={db['id']})")
+                return db["id"]
+
+        logger.info(f"[METABASE] Mendaftarkan database '{DB_NAME}' ...")
+        payload = {
+            "name":   DB_NAME,
+            "engine": "duckdb",
+            "details": {
+                "database_file": "/metabase-gold/telco_warehouse_readonly.duckdb",
+            },
+        }
+        resp = self._post("/api/database", payload)
+        resp.raise_for_status()
+        db_id = resp.json()["id"]
+        logger.success(f"[METABASE] Database '{DB_NAME}' terdaftar (id={db_id}) ✓")
+        return db_id
+
 
     # ── Main Setup ────────────────────────────────────────────────────────
     def setup(self):
         logger.info("[METABASE] Memulai setup RBAC ...")
 
-        db_id  = self.get_database_id()
+        db_id  = self.register_database()   # ← ganti get_database_id() dengan ini
+
+        # Tunggu sebentar agar Metabase selesai sync tabel setelah registrasi
+        logger.info("[METABASE] Menunggu sync tabel selesai ...")
+        time.sleep(15)
+
         tables = self.get_tables(db_id)
+        if not tables:
+            logger.warning("[METABASE] Tabel belum tersync, tunggu lebih lama ...")
+            time.sleep(20)
+            tables = self.get_tables(db_id)
 
         for role_name, allowed_tables in RBAC_MAP.items():
             group_id = self.get_or_create_group(role_name)
             self.apply_table_permissions(db_id, tables, group_id, allowed_tables)
 
         logger.success("[METABASE] Setup RBAC selesai ✓")
-        logger.info("[METABASE] Ringkasan akses:")
         for role, tables_allowed in RBAC_MAP.items():
             logger.info(f"[METABASE]   {role:<15} → {tables_allowed}")
 
 
-def wait_for_metabase(timeout: int = 120):
-    """Tunggu Metabase ready sebelum setup RBAC."""
+def wait_for_metabase(timeout: int = 300):
+    """Tunggu Metabase ready — timeout diperpanjang ke 5 menit."""
     logger.info(f"[METABASE] Menunggu Metabase siap di {METABASE_URL} ...")
     start = time.time()
     while time.time() - start < timeout:
@@ -168,45 +221,9 @@ def wait_for_metabase(timeout: int = 120):
                 return
         except requests.exceptions.ConnectionError:
             pass
-        time.sleep(5)
+        time.sleep(9)
         logger.info("[METABASE] Masih menunggu Metabase ...")
     raise TimeoutError("Metabase tidak siap dalam waktu yang ditentukan")
-
-def setup_metabase_admin(self):
-    """Setup admin user pertama kali jika Metabase belum diinisialisasi."""
-    # Cek apakah Metabase sudah di-setup
-    resp = requests.get(f"{METABASE_URL}/api/session/properties")
-    props = resp.json()
-    
-    if props.get("setup-token") is None:
-        logger.info("[METABASE] Metabase sudah di-setup sebelumnya, skip.")
-        return
-
-    setup_token = props["setup-token"]
-    logger.info("[METABASE] Metabase belum di-setup, menginisialisasi admin ...")
-
-    payload = {
-        "token": setup_token,
-        "user": {
-            "email":      METABASE_USER,
-            "password":   METABASE_PASS,
-            "first_name": "Admin",
-            "last_name":  "Telco",
-            "site_name":  "Telco Analytics",
-        },
-        "prefs": {
-            "site_name":          "Telco Analytics",
-            "allow_tracking":     False,
-        },
-    }
-
-    resp = requests.post(
-        f"{METABASE_URL}/api/setup",
-        json=payload,
-        headers=self.headers,
-    )
-    resp.raise_for_status()
-    logger.success("[METABASE] Admin berhasil dibuat ✓")
 
 
 def main():
@@ -215,7 +232,7 @@ def main():
     logger.info("=" * 55)
     wait_for_metabase()
     rbac = MetabaseRBAC()
-    rbac.setup_metabase_admin()   # ← tambahkan ini SEBELUM login
+    rbac.setup_metabase_admin()
     rbac.login()
     rbac.setup()
     logger.info("=" * 55)

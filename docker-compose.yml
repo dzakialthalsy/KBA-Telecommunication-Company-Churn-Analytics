@@ -1,10 +1,4 @@
-# ═══════════════════════════════════════════════════════════════════════════
-#  Telco Churn Analytics — Docker Compose
-#  Arsitektur: Medallion + RBAC via PostgreSQL Katalog & DuckDB Views
-# ═══════════════════════════════════════════════════════════════════════════
-
 services:
-  # ── Database Katalog (Pusat Kendali RBAC) ──────────────────────────────
   catalog_db:
     image: postgres:15
     container_name: telco_catalog
@@ -20,7 +14,6 @@ services:
     networks:
       - telco_net
 
-  # ── ETL Pipeline (Bronze → Silver → Gold + Setup RBAC Views) ───────────
   etl:
     build:
       context: .
@@ -44,9 +37,6 @@ services:
     networks:
       - telco_net
 
-  # ── Metabase (Dashboard & Visualisasi) ─────────────────────────────────
-  # Akses: http://localhost:3000
-  # Koneksi DuckDB: /metabase-gold/telco_warehouse_readonly.duckdb
   metabase:
     build:
       context: .
@@ -61,10 +51,10 @@ services:
       - MB_DB_TYPE=h2
       - MB_DB_FILE=/metabase-data/metabase.db
       - JAVA_TIMEZONE=Asia/Jakarta
-      - MB_PLUGINS_DIR=/plugins # ← wajib ada agar DuckDB driver diload
+      - MB_PLUGINS_DIR=/plugins
     depends_on:
-      etl:
-        condition: service_completed_successfully
+      catalog_db:          # ← Metabase tidak lagi tunggu etl selesai
+        condition: service_healthy
     networks:
       - telco_net
     restart: unless-stopped
