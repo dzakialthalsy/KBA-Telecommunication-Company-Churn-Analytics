@@ -14,12 +14,11 @@ import pandas as pd
 import os
 from loguru import logger
 
-# Mapping role → view yang diizinkan
-ROLE_VIEW_MAP = {
-    "Executive":   ["view_executive", "gold.churn_summary"],
-    "Operational": ["view_operational", "view_executive"],
-    "Analyst":     ["view_analyst", "view_operational", "view_executive",
-                    "gold.churn_summary", "gold.churn_risk",
+# Mapping role → Table yang diizinkan
+ROLE_OBJECT_MAP = {
+    "Executive":   ["gold.churn_summary"],
+    "Operational": ["gold.churn_risk", "gold.customer_segments"],
+    "Analyst":     ["gold.churn_summary", "gold.churn_risk",
                     "gold.customer_segments", "silver.telecom_cleaned"],
 }
 
@@ -28,10 +27,10 @@ class DuckLakeProxy:
     def __init__(self, username: str):
         self.username = username
         self.role = self._get_role_from_catalog()
-        self.allowed_views = ROLE_VIEW_MAP.get(self.role, [])
+        self.allowed_objects = ROLE_OBJECT_MAP.get(self.role, [])
         self.db_path = os.getenv("DUCKDB_PATH")
         logger.info(f"[PROXY] User '{username}' → role '{self.role}'")
-        logger.info(f"[PROXY] Views diizinkan: {self.allowed_views}")
+        logger.info(f"[PROXY] Views diizinkan: {self.allowed_objects}")
 
     def _get_role_from_catalog(self) -> str:
         """Ambil role user dari PostgreSQL katalog."""
@@ -64,14 +63,14 @@ class DuckLakeProxy:
 
         # Cek apakah query mengakses view/tabel yang diizinkan
         has_access = any(
-            view.lower() in sql_lower
-            for view in self.allowed_views
+            obj.lower() in sql_lower
+            for obj in self.allowed_objects
         )
 
         if not has_access:
             raise PermissionError(
                 f"[PROXY] ❌ Akses DITOLAK untuk role '{self.role}'. "
-                f"View yang diizinkan: {self.allowed_views}"
+                f"View yang diizinkan: {self.allowed_objects}"
             )
 
         con = duckdb.connect(self.db_path, read_only=True)
@@ -85,26 +84,26 @@ class DuckLakeProxy:
         finally:
             con.close()
 
-    def get_allowed_views(self) -> list:
+    def get_allowed_objects(self) -> list:
         """Return daftar view yang boleh diakses role ini."""
-        return self.allowed_views
+        return self.allowed_objects
 
 
 # ── Contoh penggunaan ─────────────────────────────────────────────────────
 if __name__ == "__main__":
     # Executive — hanya bisa lihat KPI agregat
     proxy_exec = DuckLakeProxy("ceo_user")
-    df = proxy_exec.query("SELECT * FROM view_executive")
+    df = proxy_exec.query("SELECT * FROM gold.churn_summary")
     print(f"Executive melihat {len(df)} baris KPI")
 
     # Operational — bisa lihat data per pelanggan
     proxy_ops = DuckLakeProxy("ops_manager")
     df2 = proxy_ops.query(
-        "SELECT * FROM view_operational WHERE risk_level = 'High' LIMIT 10"
+        "SELECT * FROM gold.churn_risk UNION ALL SELECT * FROM gold.customer_segments"
     )
     print(f"Operational melihat {len(df2)} pelanggan High Risk")
 
     # Analyst — akses penuh
     proxy_analyst = DuckLakeProxy("data_analyst")
-    df3 = proxy_analyst.query("SELECT * FROM view_analyst LIMIT 5")
+    df3 = proxy_analyst.query("SELECT * FROM gold.churn_summary UNION ALL SELECT * FROM gold.churn_risk UNION ALL SELECT * FROM gold.customer_segments UNION ALL SELECT * FROM silver.telecom_cleaned")
     print(f"Analyst melihat {len(df3)} baris data lengkap")
