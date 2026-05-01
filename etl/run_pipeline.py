@@ -1,14 +1,13 @@
 """
 ETL Pipeline — Medallion Architecture
 Telco Churn Analytics | Kelompok 4
-
 Alur:
   CSV (sumber)
     → Bronze Layer  (raw ingestion, metadata only)
     → Silver Layer  (cleaned, conformed, feature engineering)
     → Gold Layer    (business aggregates, mart siap dashboard)
+    → Export        (file DuckDB terpisah khusus Metabase, hanya schema gold)
 """
-
 import os
 import sys
 from pathlib import Path
@@ -17,10 +16,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-RAW_PATH = Path(os.getenv("RAW_DATA_PATH", "data/raw/telecom_customer.csv"))
-DUCKDB_PATH = Path(os.getenv("DUCKDB_PATH", "data/gold/telco_warehouse.duckdb"))
-ML_SCORES_PATH = Path(os.getenv("ML_SCORES_PATH", "ml/models/churn_scores.csv"))
-LOG_LEVEL = os.getenv("ETL_LOG_LEVEL", "INFO")
+RAW_PATH       = Path(os.getenv("RAW_DATA_PATH", "data/raw/telecom_customer.csv"))
+DUCKDB_PATH    = Path(os.getenv("DUCKDB_PATH",   "data/gold/telco_warehouse.duckdb"))
+ML_SCORES_PATH = Path(os.getenv("ML_SCORES_PATH","ml/models/churn_scores.csv"))
+LOG_LEVEL      = os.getenv("ETL_LOG_LEVEL", "INFO")
 
 logger.remove()
 logger.add(
@@ -33,7 +32,7 @@ logger.add(
 def main():
     logger.info("=" * 60)
     logger.info("  Telco Churn Analytics — Medallion ETL Pipeline")
-    logger.info("  Bronze → Silver → Gold")
+    logger.info("  Bronze → Silver → Gold → Export (Metabase)")
     logger.info("=" * 60)
 
     if not RAW_PATH.exists():
@@ -46,7 +45,8 @@ def main():
 
     from etl.layers.bronze import load_to_bronze
     from etl.layers.silver import load_to_silver
-    from etl.layers.gold import load_to_gold
+    from etl.layers.gold   import load_to_gold
+    from etl.export_metabase import export_metabase_duckdb
 
     # ── BRONZE ────────────────────────────────────────────────────────────
     logger.info("")
@@ -66,6 +66,12 @@ def main():
         logger.info("  ML scores belum ada → Gold pakai rule-based fallback")
     gold_results = load_to_gold(DUCKDB_PATH, ml_path)
 
+    # ── EXPORT METABASE ───────────────────────────────────────────────────
+    logger.info("")
+    logger.info("── EXPORT: Metabase DuckDB (gold only) ─────────────────")
+    readonly_path = DUCKDB_PATH.parent / "telco_warehouse_readonly.duckdb"
+    export_metabase_duckdb(DUCKDB_PATH, readonly_path)
+
     # ── SUMMARY ───────────────────────────────────────────────────────────
     logger.info("")
     logger.info("=" * 60)
@@ -74,14 +80,8 @@ def main():
     logger.info(f"  🥈 Silver : {silver_count:>10,} baris  (silver.telecom_cleaned)")
     for tbl, cnt in gold_results.items():
         logger.info(f"  🥇 Gold   : {cnt:>10,} baris  ({tbl})")
-    logger.info(f"  📦 DuckDB : {DUCKDB_PATH}")
-
-    # ── Buat copy read-only untuk Metabase ───────────────────────────────────
-    import shutil
-    readonly_path = DUCKDB_PATH.parent / "telco_warehouse_readonly.duckdb"
-    shutil.copy2(str(DUCKDB_PATH), str(readonly_path))
-    logger.info(f"  📋 Read-only copy → {readonly_path}")
-
+    logger.info(f"  📦 DuckDB utama  : {DUCKDB_PATH}")
+    logger.info(f"  📋 DuckDB Metabase: {readonly_path}")
     logger.info("=" * 60)
 
 

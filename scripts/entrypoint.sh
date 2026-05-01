@@ -14,3 +14,8 @@ echo "Running ETL Pipeline (Bronze -> Silver -> Gold)..."
 python etl/run_pipeline.py
 
 echo "ETL complete. DuckDB ready for Metabase."
+
+echo "Setting up Metabase RBAC (via API)..."
+python scripts/setup_metabase_rbac.py
+
+echo "All done."
