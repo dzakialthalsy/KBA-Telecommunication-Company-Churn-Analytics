@@ -1,4 +1,11 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Telco Churn Analytics — Docker Compose
+#  Arsitektur: Medallion + RBAC via PostgreSQL Katalog
+#  Services: catalog_db, etl, metabase, metabase_setup
+# ═══════════════════════════════════════════════════════════════════════════
+
 services:
+  # ── 1. PostgreSQL Catalog (RBAC roles & users) ─────────────────────────
   catalog_db:
     image: postgres:15
     container_name: telco_catalog
@@ -6,6 +13,9 @@ services:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=password123
       - POSTGRES_DB=ducklake_catalog
+    volumes:
+      - catalog_data:/var/lib/postgresql/data
+      - ./scripts/init_catalog.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d ducklake_catalog"]
       interval: 5s
@@ -14,6 +24,7 @@ services:
     networks:
       - telco_net
 
+  # ── 2. ETL Pipeline (Bronze → Silver → Gold) ──────────────────────────
   etl:
     build:
       context: .
@@ -37,6 +48,9 @@ services:
     networks:
       - telco_net
 
+  # ── 3. Metabase Dashboard ──────────────────────────────────────────────
+  # Akses: http://localhost:3000
+  # Koneksi DuckDB: /metabase-gold/telco_warehouse_readonly.duckdb
   metabase:
     build:
       context: .
@@ -53,14 +67,46 @@ services:
       - JAVA_TIMEZONE=Asia/Jakarta
       - MB_PLUGINS_DIR=/plugins
     depends_on:
-      catalog_db:          # ← Metabase tidak lagi tunggu etl selesai
+      catalog_db:
         condition: service_healthy
     networks:
       - telco_net
     restart: unless-stopped
 
+  # ── 4. Metabase RBAC Setup (one-shot, tunggu ETL + Metabase siap) ──────
+  # Service ini:
+  #   - Tunggu ETL selesai (service_completed_successfully)
+  #   - Tunggu Metabase siap via API polling
+  #   - Daftarkan DuckDB ke Metabase
+  #   - Buat groups (Executive, Operational, Analyst) + users demo
+  #   - Exit setelah selesai
+  metabase_setup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: telco_metabase_setup
+    volumes:
+      - ./scripts:/app/scripts
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - CATALOG_URL=postgresql://admin:password123@catalog_db:5432/ducklake_catalog
+      - METABASE_URL=http://metabase:3000
+    command: python scripts/setup_metabase_rbac.py
+    depends_on:
+      etl:
+        condition: service_completed_successfully
+      metabase:
+        condition: service_started
+    networks:
+      - telco_net
+    restart: "no" # jangan restart — cukup sekali
+
 volumes:
   metabase_data:
+  catalog_data:
 
 networks:
   telco_net:
