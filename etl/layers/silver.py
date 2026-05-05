@@ -11,6 +11,7 @@ Prinsip Medallion Silver:
 
 import duckdb
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from loguru import logger
 from sklearn.impute import SimpleImputer
@@ -57,6 +58,17 @@ IMPUTE_MEDIAN_NUM = ["phones", "models", "eqpdays"]
 EXCLUDE_FROM_CAPPING = [
     "churn", "Customer_ID", "creditcd", "asl_flag", "new_cell",
     "months", "uniqsubs", "actvsubs", "phones", "models", "totcalls",
+    # Revenue/usage — tidak dicap, akan di-log transform di Step 6.5
+    "totrev", "totmou", "adjrev", "adjmou", "avgrev", "avgmou",
+]
+
+SKEWED_COLS = [
+    "rev_Mean", "mou_Mean", "totrev", "totmou", "adjrev",
+    "adjmou", "avgrev", "avgmou", "avg3rev", "avg6rev",
+]
+
+OVERAGE_COLS = [
+    "ovrmou_Mean", "vceovr_Mean", "ovrrev_Mean", "datovr_Mean",
 ]
 
 
@@ -137,20 +149,31 @@ def load_to_silver(duckdb_path: Path) -> int:
     numeric_cols = df.select_dtypes(include=["float64", "int64"]).columns.tolist()
     cols_to_cap = [c for c in numeric_cols if c not in EXCLUDE_FROM_CAPPING]
 
-    capped_count = {}
     for col in cols_to_cap:
-        q1 = df[col].quantile(0.25)
-        q3 = df[col].quantile(0.75)
-        iqr = q3 - q1
-        lower = q1 - 1.5 * iqr
-        upper = q3 + 1.5 * iqr
-        n_outliers = ((df[col] < lower) | (df[col] > upper)).sum()
-        if n_outliers > 0:
-            df[col] = df[col].clip(lower=lower, upper=upper)
-            capped_count[col] = n_outliers
+        lower_limit = df[col].quantile(0.005)  # P0.5
+        upper_limit = df[col].quantile(0.995)  # P99.5
+        df[col] = df[col].clip(lower=lower_limit, upper=upper_limit)
 
     logger.info(
-        f"[SILVER] Step 6: Outlier capping — {len(capped_count)} kolom di-cap"
+        f"[SILVER] Step 6: Percentile capping (P0.5-P99.5) — {len(cols_to_cap)} kolom di-cap"
+    )
+
+    # ── STEP 6.5: Log Transform (skewed) + Binary Flag (zero-inflated) ────
+    # Log transform untuk kolom revenue/usage yang heavily skewed
+    skewed_exist = [c for c in SKEWED_COLS if c in df.columns]
+    for col in skewed_exist:
+        if (df[col] >= 0).all():
+            df[col + "_log"] = np.log1p(df[col])
+
+    # Binary flag + log untuk kolom overage (zero-inflated)
+    overage_exist = [c for c in OVERAGE_COLS if c in df.columns]
+    for col in overage_exist:
+        df[col + "_flag"] = (df[col] > 0).astype(int)
+        df[col + "_log"] = np.log1p(df[col])
+
+    logger.info(
+        f"[SILVER] Step 6.5: Log transform — {len(skewed_exist)} kolom skewed | "
+        f"Binary flag + log — {len(overage_exist)} kolom overage"
     )
 
     # ── STEP 7: Feature Engineering (fe_ columns) ─────────────────────────
@@ -224,7 +247,7 @@ def load_to_silver(duckdb_path: Path) -> int:
     else:
         logger.info("[SILVER] Step 8: Validasi — 0 null ✓")
 
-    logger.info(f"[SILVER] Shape akhir: {df.shape[0]:,} baris × {df.shape[1]} kolom")
+    logger.info(f"[SILVER] Shape akhir: {df.shape[0]:,} baris x {df.shape[1]} kolom")
 
     # ── STEP 9: Simpan ke Silver DuckDB ──────────────────────────────────
     con.execute(f"DROP TABLE IF EXISTS {SILVER_TABLE}")
