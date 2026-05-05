@@ -182,6 +182,41 @@ def load_to_silver(duckdb_path: Path) -> int:
 
     logger.info(f"[SILVER] Step 7: Feature engineering — {len(risk_flags) + 1} kolom fe_ dibuat")
 
+    # ── STEP 7.5: Membersihkan Kolom Area ─────────────────────────────────
+    if "area" in df.columns:
+        df["area"] = df["area"].str.replace("AREA", "", regex=False)
+        df["area"] = df["area"].str.replace("NORTHWEST/", "", regex=False)
+        df["area"] = df["area"].str.replace("CENTRAL/", "", regex=False)
+        df["area"] = df["area"].str.strip()
+        
+        area_mapping = {
+            "ROCKY MOUNTAIN": "Washington",
+            "CHICAGO": "Illinois",
+            "GREAT LAKES": "Michigan",
+            "NEW ENGLAND": "Massachusetts",
+            "DALLAS": "Texas",
+            "SOUTH TEXAS": "Texas",
+            "HOUSTON": "Texas",
+            "MIDWEST": "Kansas",
+            "PHILADELPHIA": "Pennsylvania",
+            "SOUTHWEST": "Arizona",
+            "NEW YORK CITY": "New York",
+            "LOS ANGELES": "California",
+            "CALIFORNIA NORTH": "California",
+            "NEW YORK CITY": "New York",
+            "DC/MARYLAND/VIRGINIA": "Maryland",
+            "SOUTH FLORIDA": "Florida",
+            "NORTH FLORIDA": "Florida",
+            "GREAT LAKES": "Michigan",
+            "NEW ENGLAND": "Massachusetts",
+            "MIDWEST": "Kansas",
+            "SOUTHWEST": "Arizona",
+            "ATLANTIC SOUTH": "Georgia"
+        }
+        df["area"] = df["area"].replace(area_mapping)
+        
+        logger.info("[SILVER] Step 7.5: Kolom 'area' dibersihkan dan di-mapping ke negara bagian")
+
     # ── STEP 8: Validasi akhir ────────────────────────────────────────────
     final_null = df.isnull().sum().sum()
     if final_null > 0:
