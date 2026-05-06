@@ -149,7 +149,7 @@ class MetabaseRBAC:
         return gid
 
     # ── Permissions ───────────────────────────────────────────────────────
-    def apply_table_permissions(self, db_id: int, tables: dict, group_id: int, allowed_tables: list):
+    def apply_table_permissions(self, db_id: int, tables: dict, group_id: int, allowed_tables: list, role_name=""):
         resp = self._get("/api/permissions/graph")
         resp.raise_for_status()
         graph = resp.json()
@@ -163,9 +163,15 @@ class MetabaseRBAC:
         # Metabase Community: granular per-tabel tidak didukung
         # Semua group diberi akses unrestricted di level DB
         # Pembatasan dilakukan via Collections (manual) atau DuckLakeProxy
+        # Analyst → bisa SQL, role lain → GUI only
+        query_access = (
+            "query-builder-and-native"
+            if role_name == "Analyst"
+            else "query-builder"
+        )
         graph["groups"][group_key][db_key] = {
             "view-data": "unrestricted",
-            "create-queries": "query-builder",
+            "create-queries": query_access,
         }
 
         resp = self._put("/api/permissions/graph", graph)
@@ -242,7 +248,10 @@ class MetabaseRBAC:
         for role_name, allowed_tables in RBAC_MAP.items():
             group_id = self.get_or_create_group(role_name)
             groups[role_name] = group_id
-            self.apply_table_permissions(db_id, tables, group_id, allowed_tables)
+            self.apply_table_permissions(
+                db_id, tables, group_id,
+                allowed_tables, role_name=role_name  # ← tambahkan ini
+            )
 
         self.create_users_and_assign_groups(groups)
 
