@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telco Churn Predictor</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --panel: rgba(255, 252, 247, 0.92);
+      --ink: #1d2a32;
+      --muted: #5a6b73;
+      --accent: #d6653c;
+      --accent-dark: #8f3d22;
+      --line: rgba(29, 42, 50, 0.12);
+      --shadow: 0 20px 60px rgba(58, 34, 18, 0.14);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(214, 101, 60, 0.24), transparent 24rem),
+        radial-gradient(circle at bottom right, rgba(42, 92, 130, 0.16), transparent 22rem),
+        var(--bg);
+    }
+    .shell { max-width: 1240px; margin: 0 auto; padding: 32px 20px 48px; }
+    .hero { display: grid; gap: 16px; margin-bottom: 28px; }
+    .eyebrow { font-size: 0.82rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent-dark); }
+    h1 { margin: 0; font-size: clamp(2.3rem, 5vw, 4.6rem); line-height: 0.95; max-width: 12ch; }
+    .lede { margin: 0; max-width: 70ch; color: var(--muted); font-size: 1.02rem; line-height: 1.65; }
+    .board { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 0.9fr); gap: 20px; align-items: start; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow); backdrop-filter: blur(8px); }
+    form.card { padding: 24px; }
+    .result { position: sticky; top: 20px; padding: 24px; overflow: hidden; }
+    .group { margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+    .group:last-of-type { border-bottom: 0; margin-bottom: 14px; padding-bottom: 0; }
+    .group h2 { margin: 0 0 14px; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+    label { display: grid; gap: 7px; font-size: 0.9rem; color: var(--muted); }
+    input, select, button { width: 100%; border-radius: 14px; border: 1px solid var(--line); font: inherit; }
+    input, select { padding: 11px 12px; background: rgba(255, 255, 255, 0.82); color: var(--ink); }
+    button { margin-top: 8px; padding: 14px 18px; border: 0; cursor: pointer; color: white; background: linear-gradient(135deg, var(--accent), #b24d2c); box-shadow: 0 16px 28px rgba(214, 101, 60, 0.24); }
+    .pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 8px 12px; background: rgba(29, 42, 50, 0.06); color: var(--muted); font-size: 0.86rem; }
+    .score { margin: 22px 0 8px; font-size: clamp(2.4rem, 8vw, 4rem); line-height: 1; }
+    .state { margin: 0; font-size: 1.05rem; }
+    .meta { margin-top: 18px; display: grid; gap: 10px; color: var(--muted); font-size: 0.95rem; }
+    .note { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.88rem; line-height: 1.6; }
+    .status { min-height: 1.3rem; color: var(--accent-dark); font-size: 0.9rem; }
+    @media (max-width: 960px) {
+      .board { grid-template-columns: 1fr; }
+      .result { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="eyebrow">Telco Churn Inference</div>
+      <h1>Predict who will leave before they do.</h1>
+      <p class="lede">Masukkan nilai fitur pelanggan yang dibutuhkan model. Aplikasi akan mengembalikan label churn dan probabilitas churn dalam bentuk persentase.</p>
+    </section>
+    <div class="board">
+      <form id="prediction-form" class="card">
+        {% for group in grouped_fields %}
+        <section class="group">
+          <h2>{{ group.name }}</h2>
+          <div class="grid">
+            {% for field in group.fields %}
+            <label>
+              <span>{{ field.name }}</span>
+              {% if field.type == "select" %}
+              <select name="{{ field.name }}">
+                {% for option in field.options %}
+                <option value="{{ option }}" {% if option == field.default %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+              {% else %}
+              <input type="number" step="{{ field.step }}" name="{{ field.name }}" value="{{ field.default }}">
+              {% endif %}
+            </label>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+        <div class="status" id="status"></div>
+        <button type="submit">Prediksi Churn</button>
+      </form>
+
+      <aside class="card result">
+        <div class="pill">{{ model_name }}</div>
+        <div class="score" id="score">0.00%</div>
+        <p class="state" id="state">Menunggu input prediksi</p>
+        <div class="meta">
+          <div>Label: <strong id="label">-</strong></div>
+          <div>Probability: <strong id="probability">-</strong></div>
+        </div>
+        <div class="note">{{ note }}</div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("prediction-form");
+    const statusNode = document.getElementById("status");
+    const scoreNode = document.getElementById("score");
+    const stateNode = document.getElementById("state");
+    const labelNode = document.getElementById("label");
+    const probabilityNode = document.getElementById("probability");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      statusNode.textContent = "Memproses prediksi...";
+      const payload = { features: {} };
+      const formData = new FormData(form);
+      for (const [key, value] of formData.entries()) {
+        payload.features[key] = value;
+      }
+
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          throw new Error("Request gagal diproses.");
+        }
+        const result = await response.json();
+        scoreNode.textContent = `${result.churn_rate_percent.toFixed(2)}%`;
+        stateNode.textContent = result.prediction;
+        labelNode.textContent = result.churn_label;
+        probabilityNode.textContent = result.churn_probability.toFixed(4);
+        statusNode.textContent = "";
+      } catch (error) {
+        statusNode.textContent = "Prediksi gagal. Periksa input lalu coba lagi.";
+      }
+    });
+  </script>
+</body>
+</html>
