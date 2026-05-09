@@ -13,9 +13,9 @@ METABASE_PASS = os.getenv("METABASE_PASS", "admin123")
 DB_NAME       = os.getenv("METABASE_DB_NAME", "Telco Warehouse")
 
 RBAC_MAP = {
-    "Executive":   ["churn_summary"],
+    "Executive":   ["churn_summary", "churn_prediction"],
     "Operational": ["churn_risk", "customer_segments"],
-    "Analyst":     ["churn_summary", "churn_risk", "customer_segments", "telecom_cleaned"],
+    "Analyst":     ["churn_summary", "churn_risk", "customer_segments", "telecom_cleaned", "churn_prediction"],
 }
 
 USERS_MAP = {

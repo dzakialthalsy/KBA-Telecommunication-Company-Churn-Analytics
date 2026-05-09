@@ -23,6 +23,7 @@ GOLD_SCHEMA = "gold"
 GOLD_CUSTOMER_SEGMENTS = f"{GOLD_SCHEMA}.customer_segments"
 GOLD_CHURN_RISK = f"{GOLD_SCHEMA}.churn_risk"
 GOLD_CHURN_SUMMARY = f"{GOLD_SCHEMA}.churn_summary"
+GOLD_CHURN_PREDICTION = f"{GOLD_SCHEMA}.churn_prediction"
 
 # Nama kolom ID di dataset asli Kaggle adalah "Customer_ID" (kapital)
 CUSTOMER_ID_COL = "Customer_ID"
@@ -67,6 +68,16 @@ def load_to_gold(duckdb_path: Path, model_scores_path: Path = None) -> dict:
     con.execute(f"CREATE TABLE {GOLD_CHURN_SUMMARY} AS SELECT * FROM df_summary")
     results[GOLD_CHURN_SUMMARY] = len(df_summary)
     logger.success(f"[GOLD] {GOLD_CHURN_SUMMARY}: {len(df_summary):,} baris ✓")
+
+    # ── Tabel 4: gold.churn_prediction (NEW) ─────────────────────────────
+    if model_scores_path and Path(model_scores_path).exists():
+        df_pred = _build_churn_prediction(df.copy(), model_scores_path)
+        con.execute(f"DROP TABLE IF EXISTS {GOLD_CHURN_PREDICTION}")
+        con.execute(f"CREATE TABLE {GOLD_CHURN_PREDICTION} AS SELECT * FROM df_pred")
+        results[GOLD_CHURN_PREDICTION] = len(df_pred)
+        logger.success(f"[GOLD] {GOLD_CHURN_PREDICTION}: {len(df_pred):,} baris ✓")
+    else:
+        logger.info("[GOLD] churn_scores.csv belum ada → churn_prediction dilewati")
 
     con.close()
     return results
@@ -216,3 +227,63 @@ def _build_churn_summary(df: pd.DataFrame) -> pd.DataFrame:
             })
 
     return pd.DataFrame(rows)
+
+def _build_churn_prediction(df: pd.DataFrame, model_scores_path: Path) -> pd.DataFrame:
+    """
+    Tabel prediksi ML — hanya berisi test set (20k baris dari churn_scores.csv).
+    Digabung dengan fitur profil pelanggan dari Silver untuk konteks analisis.
+    """
+    ml_scores = pd.read_csv(model_scores_path)
+
+    # Normalise nama kolom ID
+    for candidate in ["Customer_ID", "customer_id", "CustomerID"]:
+        if candidate in ml_scores.columns:
+            ml_scores = ml_scores.rename(columns={candidate: CUSTOMER_ID_COL})
+            break
+
+    # Validasi kolom wajib
+    required = ["ml_churn_score", "ml_churn_label"]
+    missing = [c for c in required if c not in ml_scores.columns]
+    if missing:
+        raise ValueError(f"[GOLD] churn_scores.csv kurang kolom: {missing}")
+
+    # Join dengan Silver untuk tambah konteks pelanggan
+    context_cols = [c for c in [
+        CUSTOMER_ID_COL,
+        "avgrev",
+        "change_rev",
+        "months",
+        "custcare_Mean",
+        "drop_vce_Mean",
+        "customer_segment",  # dari _build_customer_segments (jika sudah ada)
+        "fe_churn_risk_rule",
+    ] if c in df.columns]
+
+    df_pred = ml_scores[[CUSTOMER_ID_COL] + required].merge(
+        df[context_cols],
+        on=CUSTOMER_ID_COL,
+        how="left",
+    )
+
+        # Risk level berdasarkan ml_churn_score
+    def risk_level(score):
+        if pd.isna(score):
+            return "Unknown"
+        if score >= HIGH_RISK_THRESHOLD:
+            return "High"
+        if score >= MEDIUM_RISK_THRESHOLD:
+            return "Medium"
+        return "Low"
+
+    df_pred["risk_level"] = df_pred["ml_churn_score"].apply(risk_level)
+
+    # Kolom evaluasi model (hanya ada jika actual label tersedia)
+    if "churn" in df_pred.columns:
+        df_pred["is_correct"] = (
+            df_pred["ml_churn_label"] == df_pred["churn"]
+        ).astype(int)
+
+    logger.info(f"[GOLD] churn_prediction: {len(df_pred):,} baris test set")
+    logger.info(f"[GOLD] Distribusi risk_level:\n{df_pred['risk_level'].value_counts().to_string()}")
+
+    return df_pred.reset_index(drop=True)

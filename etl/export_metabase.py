@@ -21,6 +21,7 @@ GOLD_TABLES = [
     "churn_summary",
     "churn_risk",
     "customer_segments",
+    "churn_prediction",
 ]
 
 # Tabel dari schema silver yang dipindah ke gold di file Metabase
