@@ -211,7 +211,7 @@ def load_to_silver(duckdb_path: Path) -> int:
         df["area"] = df["area"].str.replace("NORTHWEST/", "", regex=False)
         df["area"] = df["area"].str.replace("CENTRAL/", "", regex=False)
         df["area"] = df["area"].str.strip()
-        
+
         area_mapping = {
             "ROCKY MOUNTAIN": "Washington",
             "CHICAGO": "Illinois",
@@ -237,7 +237,7 @@ def load_to_silver(duckdb_path: Path) -> int:
             "ATLANTIC SOUTH": "Georgia"
         }
         df["area"] = df["area"].replace(area_mapping)
-        
+
         logger.info("[SILVER] Step 7.5: Kolom 'area' dibersihkan dan di-mapping ke negara bagian")
 
     # ── STEP 8: Validasi akhir ────────────────────────────────────────────

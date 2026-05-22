@@ -16,10 +16,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-RAW_PATH       = Path(os.getenv("RAW_DATA_PATH", "data/raw/telecom_customer.csv"))
-DUCKDB_PATH    = Path(os.getenv("DUCKDB_PATH",   "data/gold/telco_warehouse.duckdb"))
-ML_SCORES_PATH = Path(os.getenv("ML_SCORES_PATH","ml/models/churn_scores.csv"))
-LOG_LEVEL      = os.getenv("ETL_LOG_LEVEL", "INFO")
+RAW_PATH = Path(os.getenv("RAW_DATA_PATH", "data/raw/telecom_customer.csv"))
+DUCKDB_PATH = Path(os.getenv("DUCKDB_PATH", "data/gold/telco_warehouse.duckdb"))
+ML_SCORES_PATH = Path(os.getenv("ML_SCORES_PATH", "ml/models/churn_scores.csv"))
+LOG_LEVEL = os.getenv("ETL_LOG_LEVEL", "INFO")
 
 logger.remove()
 logger.add(
@@ -45,7 +45,7 @@ def main():
 
     from etl.layers.bronze import load_to_bronze
     from etl.layers.silver import load_to_silver
-    from etl.layers.gold   import load_to_gold
+    from etl.layers.gold import load_to_gold
     from etl.export_metabase import export_metabase_duckdb
 
     # ── BRONZE ────────────────────────────────────────────────────────────

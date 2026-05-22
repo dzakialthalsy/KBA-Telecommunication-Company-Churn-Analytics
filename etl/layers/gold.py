@@ -228,6 +228,7 @@ def _build_churn_summary(df: pd.DataFrame) -> pd.DataFrame:
 
     return pd.DataFrame(rows)
 
+
 def _build_churn_prediction(df: pd.DataFrame, model_scores_path: Path) -> pd.DataFrame:
     """
     Tabel prediksi ML — hanya berisi test set (20k baris dari churn_scores.csv).
@@ -265,7 +266,7 @@ def _build_churn_prediction(df: pd.DataFrame, model_scores_path: Path) -> pd.Dat
         how="left",
     )
 
-        # Risk level berdasarkan ml_churn_score
+    # Risk level berdasarkan ml_churn_score
     def risk_level(score):
         if pd.isna(score):
             return "Unknown"
