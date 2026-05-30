@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  Telco Churn Analytics — Docker Compose
 #  Arsitektur: Medallion + RBAC via PostgreSQL Katalog
-#  Services: catalog_db, etl, metabase, metabase_setup
+#  Services: catalog_db, etl, metabase, metabase_setup, dashboard
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
@@ -103,6 +103,37 @@ services:
     networks:
       - telco_net
     restart: "no" # jangan restart — cukup sekali
+
+  # â”€â”€ 5. Executive Dashboard + Predictor (Docker-only access) â”€â”€â”€â”€â”€â”€â”€â”€
+  # Akses:
+  #   docker compose up --build dashboard
+  #   http://127.0.0.1:8000
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.inference
+    container_name: telco_dashboard
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./ml:/app/ml
+      - ./dashboard:/app/dashboard
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - APP_DOCKER_RUNTIME=true
+      - APP_REQUIRE_DOCKER=true
+      - DUCKDB_PATH=/app/data/gold/telco_warehouse.duckdb
+      - ML_SCORES_PATH=/app/ml/models/churn_scores.csv
+      - RAW_DATA_PATH=/app/data/raw/Telecom_customer.csv
+    depends_on:
+      etl:
+        condition: service_completed_successfully
+    networks:
+      - telco_net
+    restart: unless-stopped
 
 volumes:
   metabase_data:

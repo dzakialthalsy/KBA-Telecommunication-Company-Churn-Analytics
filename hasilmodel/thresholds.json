@@ -1,0 +1,11 @@
+{
+  "lightgbm": 0.5113269203547121,
+  "xgboost": 0.5134944915771484,
+  "random_forest": 0.5244797226392584,
+  "logistic_regression": 0.5767845463905955,
+  "catboost": 0.5144523490616555,
+  "xgboost_tuned": 0.5144539475440979,
+  "stacking": 0.5152834865311533,
+  "threshold_strategy": "min_precision",
+  "min_precision_target": 0.65
+}

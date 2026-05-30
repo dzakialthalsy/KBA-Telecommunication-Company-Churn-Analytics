@@ -59,9 +59,9 @@ KBA-Telecommunication-Company-Churn-Analytics/
 |   `-- reports/            # Laporan evaluasi model
 |-- scripts/                # Health check, init catalog, setup Metabase RBAC
 |-- tests/                  # Unit test pipeline
-|-- docker-compose.yml      # catalog_db, etl, metabase, metabase_setup
+|-- docker-compose.yml      # catalog_db, etl, metabase, metabase_setup, dashboard
 |-- Dockerfile              # Image ETL
-|-- Dockerfile.inference    # Image predictor FastAPI
+|-- Dockerfile.inference    # Image dashboard FastAPI
 |-- Dockerfile.metabase     # Image Metabase + plugin DuckDB
 |-- requirements.txt
 `-- .env.example
@@ -70,7 +70,7 @@ KBA-Telecommunication-Company-Churn-Analytics/
 ## Prasyarat
 
 - Python 3.11 atau versi kompatibel.
-- Docker dan Docker Compose untuk menjalankan pipeline plus Metabase.
+- Docker dan Docker Compose untuk menjalankan pipeline, Metabase, dan web dashboard.
 - Dataset Kaggle Telecom Customer Churn disimpan di folder `data/raw/`.
 - File `.env` dibuat dari `.env.example`.
 
@@ -90,6 +90,8 @@ python etl\run_pipeline.py
 
 Jika memakai Git Bash atau WSL, gunakan `cp .env.example .env` sebagai pengganti `copy`.
 
+Catatan: web dashboard FastAPI dikunci agar hanya bisa diakses dari runtime Docker. Menjalankan `uvicorn dashboard.churn_app:app` langsung di host akan ditolak dengan HTTP 403.
+
 ## Menjalankan dengan Docker dan Metabase
 
 ```powershell
@@ -104,6 +106,7 @@ Service yang dijalankan:
 | `etl` | Menjalankan pipeline Bronze -> Silver -> Gold. |
 | `metabase` | Dashboard BI di `http://localhost:3000`. |
 | `metabase_setup` | One-shot setup untuk database, group, permission, dan user demo. |
+| `dashboard` | Executive dashboard + predictor FastAPI di `http://127.0.0.1:8000`, hanya via Docker. |
 
 Akses Metabase lokal:
 
@@ -155,28 +158,65 @@ Setelah file skor tersedia, jalankan ulang:
 python etl\run_pipeline.py
 ```
 
-## FastAPI Predictor Opsional
+### Menambahkan Kolom RL ke Churn Scores
 
-Untuk membuat bundle inference dan menjalankan aplikasi prediksi:
+Project ini menambahkan RL ringan berbasis contextual bandit sebagai decision layer di atas `ml_churn_score`.
+Skor churn lama tetap dipertahankan, lalu file `ml/models/churn_scores.csv` diperkaya dengan rekomendasi aksi retensi:
 
 ```powershell
-python dashboard\build_inference_bundle.py
-uvicorn dashboard.churn_app:app --host 0.0.0.0 --port 8000
+python -m ml.rl.retention_bandit --scores-path ml\models\churn_scores.csv
 ```
+
+Kolom tambahan yang dihasilkan:
+
+| Kolom | Keterangan |
+| --- | --- |
+| `rl_recommended_action` | Aksi retensi yang direkomendasikan. |
+| `rl_expected_reward` | Estimasi nilai bisnis setelah biaya aksi. |
+| `rl_estimated_churn_reduction` | Estimasi penurunan probabilitas churn. |
+| `rl_adjusted_churn_score` | Skor churn setelah simulasi aksi retensi. |
+| `rl_action_cost` | Estimasi biaya aksi. |
+| `rl_policy_confidence` | Confidence relatif antara aksi terbaik dan runner-up. |
+| `rl_policy_version` | Versi policy RL yang dipakai. |
+| `rl_generated_at` | Timestamp pembuatan rekomendasi. |
+
+Jika kolom RL tersedia di `churn_scores.csv`, Gold layer akan ikut membawa kolom tersebut ke tabel `gold.churn_risk` dan `gold.churn_prediction`.
+
+## Web Dashboard Docker-Only
+
+Website FastAPI sekarang berisi Executive Dashboard dan Predictor, dan dikunci agar hanya bisa diakses melalui container Docker.
+
+```powershell
+docker compose up --build dashboard
+```
+
+Akses lokal melalui browser:
+
+```text
+http://127.0.0.1:8000
+```
+
+Jika aplikasi dijalankan langsung di host dengan `uvicorn`, middleware akan mengembalikan HTTP 403 karena `APP_REQUIRE_DOCKER=true`.
 
 Endpoint utama:
 
 | Endpoint | Fungsi |
 | --- | --- |
-| `GET /` | Form prediksi churn berbasis template HTML. |
+| `GET /` | Executive dashboard dan tab predictor. |
 | `GET /health` | Health check aplikasi. |
+| `GET /api/dashboard/executive` | Data JSON untuk visualisasi executive dashboard. |
 | `POST /predict` | Prediksi churn dari payload fitur pelanggan. |
 
-Alternatif Docker:
+Alternatif menjalankan image dashboard tanpa Compose:
 
 ```powershell
 docker build -f Dockerfile.inference -t telco-churn-inference .
-docker run --rm -p 8000:8000 telco-churn-inference
+docker run --rm -p 127.0.0.1:8000:8000 `
+  -v ${PWD}\data:/app/data `
+  -v ${PWD}\ml:/app/ml `
+  -e APP_DOCKER_RUNTIME=true `
+  -e APP_REQUIRE_DOCKER=true `
+  telco-churn-inference
 ```
 
 ## Environment Variables Penting
@@ -186,6 +226,7 @@ docker run --rm -p 8000:8000 telco-churn-inference
 | `RAW_DATA_PATH` | Lokasi dataset CSV sumber. |
 | `DUCKDB_PATH` | Lokasi warehouse utama DuckDB. |
 | `ML_SCORES_PATH` | Lokasi file skor ML untuk Gold layer. |
+| `APP_REQUIRE_DOCKER` | Jika `true`, website FastAPI menolak akses non-container. |
 | `ETL_LOG_LEVEL` | Level logging ETL. |
 | `METABASE_URL` | URL Metabase untuk setup otomatis. |
 | `METABASE_USER` | Email admin Metabase. |

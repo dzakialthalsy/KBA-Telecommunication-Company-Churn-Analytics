@@ -1,142 +1,745 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telco Churn Predictor</title>
+  <title>Telco Churn Executive Dashboard</title>
   <style>
     :root {
-      --bg: #f4efe6;
-      --panel: rgba(255, 252, 247, 0.92);
-      --ink: #1d2a32;
-      --muted: #5a6b73;
-      --accent: #d6653c;
-      --accent-dark: #8f3d22;
-      --line: rgba(29, 42, 50, 0.12);
-      --shadow: 0 20px 60px rgba(58, 34, 18, 0.14);
+      --bg: #f6f7f2;
+      --surface: #ffffff;
+      --surface-2: #eef3ee;
+      --ink: #17201b;
+      --muted: #657269;
+      --line: #dce4dc;
+      --green: #237a57;
+      --red: #c94242;
+      --amber: #bb7a12;
+      --blue: #356bb3;
+      --violet: #7453a6;
+      --shadow: 0 12px 28px rgba(23, 32, 27, 0.08);
     }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      font-family: Georgia, "Times New Roman", serif;
+      min-height: 100vh;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(214, 101, 60, 0.24), transparent 24rem),
-        radial-gradient(circle at bottom right, rgba(42, 92, 130, 0.16), transparent 22rem),
+        linear-gradient(180deg, rgba(255,255,255,0.70), rgba(246,247,242,0.94)),
         var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
     }
-    .shell { max-width: 1240px; margin: 0 auto; padding: 32px 20px 48px; }
-    .hero { display: grid; gap: 16px; margin-bottom: 28px; }
-    .eyebrow { font-size: 0.82rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent-dark); }
-    h1 { margin: 0; font-size: clamp(2.3rem, 5vw, 4.6rem); line-height: 0.95; max-width: 12ch; }
-    .lede { margin: 0; max-width: 70ch; color: var(--muted); font-size: 1.02rem; line-height: 1.65; }
-    .board { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 0.9fr); gap: 20px; align-items: start; }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow); backdrop-filter: blur(8px); }
-    form.card { padding: 24px; }
-    .result { position: sticky; top: 20px; padding: 24px; overflow: hidden; }
-    .group { margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
-    .group:last-of-type { border-bottom: 0; margin-bottom: 14px; padding-bottom: 0; }
-    .group h2 { margin: 0 0 14px; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-    label { display: grid; gap: 7px; font-size: 0.9rem; color: var(--muted); }
-    input, select, button { width: 100%; border-radius: 14px; border: 1px solid var(--line); font: inherit; }
-    input, select { padding: 11px 12px; background: rgba(255, 255, 255, 0.82); color: var(--ink); }
-    button { margin-top: 8px; padding: 14px 18px; border: 0; cursor: pointer; color: white; background: linear-gradient(135deg, var(--accent), #b24d2c); box-shadow: 0 16px 28px rgba(214, 101, 60, 0.24); }
-    .pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 8px 12px; background: rgba(29, 42, 50, 0.06); color: var(--muted); font-size: 0.86rem; }
-    .score { margin: 22px 0 8px; font-size: clamp(2.4rem, 8vw, 4rem); line-height: 1; }
-    .state { margin: 0; font-size: 1.05rem; }
-    .meta { margin-top: 18px; display: grid; gap: 10px; color: var(--muted); font-size: 0.95rem; }
-    .note { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.88rem; line-height: 1.6; }
-    .status { min-height: 1.3rem; color: var(--accent-dark); font-size: 0.9rem; }
-    @media (max-width: 960px) {
-      .board { grid-template-columns: 1fr; }
-      .result { position: static; }
+
+    button, input, select { font: inherit; }
+
+    .shell {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 0 18px;
+      background: rgba(246, 247, 242, 0.88);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--ink);
+      color: white;
+      font-weight: 800;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    .brand-subtitle {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .tab-button {
+      width: auto;
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .tab-button.active {
+      color: white;
+      background: var(--ink);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .page-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 8px 0 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 4vw, 3.25rem);
+      line-height: 1.04;
+      max-width: 760px;
+    }
+
+    .heading-copy {
+      margin: 8px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .source-chip {
+      display: grid;
+      gap: 3px;
+      min-width: 210px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .source-chip strong { color: var(--ink); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      min-height: 128px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .metric-label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin: 14px 0 8px;
+      font-size: clamp(1.55rem, 3vw, 2.25rem);
+      font-weight: 800;
+      line-height: 1;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-detail {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .viz-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .panel {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.25;
+    }
+
+    .panel-note {
+      color: var(--muted);
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    .bar-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 0.9fr) minmax(140px, 2fr) minmax(72px, auto);
+      align-items: center;
+      gap: 10px;
+    }
+
+    .bar-label {
+      min-width: 0;
+      color: var(--ink);
+      font-size: 0.9rem;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+
+    .bar-track {
+      height: 11px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--surface-2);
+    }
+
+    .bar-fill {
+      width: var(--bar);
+      min-width: 2px;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--green);
+    }
+
+    .bar-fill.red { background: var(--red); }
+    .bar-fill.amber { background: var(--amber); }
+    .bar-fill.blue { background: var(--blue); }
+    .bar-fill.violet { background: var(--violet); }
+
+    .bar-value {
+      color: var(--muted);
+      font-size: 0.86rem;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .tenure-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      align-items: end;
+      min-height: 210px;
+    }
+
+    .tenure-item {
+      display: grid;
+      gap: 8px;
+      align-content: end;
+      min-height: 180px;
+    }
+
+    .tenure-column {
+      height: max(8px, var(--bar));
+      min-height: 8px;
+      border-radius: 8px 8px 3px 3px;
+      background: linear-gradient(180deg, var(--red), var(--amber));
+    }
+
+    .tenure-label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 0.9rem;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .action-pill {
+      display: inline-flex;
+      max-width: 220px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #edf3ff;
+      color: var(--blue);
+      font-size: 0.8rem;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .empty-state {
+      padding: 18px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: var(--surface);
+    }
+
+    .predictor-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.8fr) minmax(300px, 0.9fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    form.panel { box-shadow: var(--shadow); }
+
+    .field-group {
+      margin-bottom: 20px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .field-group:last-of-type {
+      margin-bottom: 12px;
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .field-group h2 {
+      margin: 0 0 12px;
+      font-size: 0.95rem;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.86rem;
+      min-width: 0;
+    }
+
+    input, select {
+      width: 100%;
+      min-height: 40px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: white;
+    }
+
+    input:focus, select:focus, .tab-button:focus, .primary-button:focus {
+      outline: 3px solid rgba(53, 107, 179, 0.24);
+      outline-offset: 2px;
+    }
+
+    .primary-button {
+      width: 100%;
+      min-height: 46px;
+      margin-top: 8px;
+      border: 0;
+      border-radius: 8px;
+      color: white;
+      background: var(--green);
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .primary-button:hover { background: #1d6749; }
+
+    .status {
+      min-height: 22px;
+      color: var(--red);
+      font-size: 0.88rem;
+    }
+
+    .score {
+      margin: 18px 0 8px;
+      font-size: clamp(2.2rem, 7vw, 4rem);
+      font-weight: 850;
+      line-height: 1;
+    }
+
+    .state {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 750;
+    }
+
+    .meta {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .note {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1080px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .span-4, .span-6, .span-8 { grid-column: span 12; }
+      .predictor-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      .shell { padding: 12px; }
+      .topbar, .page-heading { align-items: stretch; flex-direction: column; }
+      .tabs { width: 100%; }
+      .tab-button { flex: 1; }
+      .source-chip { min-width: 0; }
+      .kpi-grid { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; gap: 6px; }
+      .bar-value { text-align: left; }
+      .tenure-grid { grid-template-columns: repeat(5, minmax(48px, 1fr)); overflow-x: auto; }
     }
   </style>
 </head>
 <body>
   <div class="shell">
-    <section class="hero">
-      <div class="eyebrow">Telco Churn Inference</div>
-      <h1>Predict who will leave before they do.</h1>
-      <p class="lede">Masukkan nilai fitur pelanggan yang dibutuhkan model. Aplikasi akan mengembalikan label churn dan probabilitas churn dalam bentuk persentase.</p>
-    </section>
-    <div class="board">
-      <form id="prediction-form" class="card">
-        {% for group in grouped_fields %}
-        <section class="group">
-          <h2>{{ group.name }}</h2>
-          <div class="grid">
-            {% for field in group.fields %}
-            <label>
-              <span>{{ field.name }}</span>
-              {% if field.type == "select" %}
-              <select name="{{ field.name }}">
-                {% for option in field.options %}
-                <option value="{{ option }}" {% if option == field.default %}selected{% endif %}>{{ option }}</option>
-                {% endfor %}
-              </select>
-              {% else %}
-              <input type="number" step="{{ field.step }}" name="{{ field.name }}" value="{{ field.default }}">
-              {% endif %}
-            </label>
-            {% endfor %}
-          </div>
-        </section>
-        {% endfor %}
-        <div class="status" id="status"></div>
-        <button type="submit">Prediksi Churn</button>
-      </form>
-
-      <aside class="card result">
-        <div class="pill">{{ model_name }}</div>
-        <div class="score" id="score">0.00%</div>
-        <p class="state" id="state">Menunggu input prediksi</p>
-        <div class="meta">
-          <div>Label: <strong id="label">-</strong></div>
-          <div>Probability: <strong id="probability">-</strong></div>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">T</div>
+        <div>
+          <p class="brand-title">Telco Churn Analytics</p>
+          <p class="brand-subtitle">Executive dashboard and churn predictor</p>
         </div>
-        <div class="note">{{ note }}</div>
-      </aside>
-    </div>
+      </div>
+      <nav class="tabs" aria-label="Dashboard sections">
+        <button class="tab-button active" type="button" data-tab="executive">Executive</button>
+        <button class="tab-button" type="button" data-tab="predictor">Predictor</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="executive" class="tab-panel active">
+        <div class="page-heading">
+          <div>
+            <h1>Executive Churn Dashboard</h1>
+            <p class="heading-copy">Ringkasan bisnis dari churn rate, risiko pelanggan, segmentasi, ARPU, dan rekomendasi retensi berbasis model.</p>
+          </div>
+          <div class="source-chip">
+            <span>Data source</span>
+            <strong>{{ dashboard.source }}</strong>
+            <span>Updated {{ dashboard.last_updated }}</span>
+          </div>
+        </div>
+
+        {% if dashboard.kpis %}
+        <section class="kpi-grid" aria-label="Executive KPI">
+          {% for kpi in dashboard.kpis %}
+          <article class="metric">
+            <p class="metric-label">{{ kpi.label }}</p>
+            <p class="metric-value">{{ kpi.value }}</p>
+            <p class="metric-detail">{{ kpi.detail }}</p>
+          </article>
+          {% endfor %}
+        </section>
+        {% else %}
+        <div class="empty-state">Data dashboard belum tersedia.</div>
+        {% endif %}
+
+        <section class="viz-grid" aria-label="Executive visualizations">
+          <article class="panel span-6">
+            <div class="panel-header">
+              <h2 class="panel-title">Risk Distribution</h2>
+              <span class="panel-note">Customer count</span>
+            </div>
+            <div class="bar-list">
+              {% for item in dashboard.risk_distribution %}
+              <div class="bar-row">
+                <div class="bar-label">{{ item.label }}</div>
+                <div class="bar-track"><div class="bar-fill {% if item.label == 'High' %}red{% elif item.label == 'Medium' %}amber{% else %}green{% endif %}" style="--bar: {{ item.percent }}%;"></div></div>
+                <div class="bar-value">{{ item.display }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </article>
+
+          <article class="panel span-6">
+            <div class="panel-header">
+              <h2 class="panel-title">Customer Segments</h2>
+              <span class="panel-note">Portfolio mix</span>
+            </div>
+            <div class="bar-list">
+              {% for item in dashboard.segment_distribution %}
+              <div class="bar-row">
+                <div class="bar-label">{{ item.label }}</div>
+                <div class="bar-track"><div class="bar-fill blue" style="--bar: {{ item.percent }}%;"></div></div>
+                <div class="bar-value">{{ item.display }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </article>
+
+          <article class="panel span-8">
+            <div class="panel-header">
+              <h2 class="panel-title">RL Retention Action Plan</h2>
+              <span class="panel-note">Recommended action</span>
+            </div>
+            {% if dashboard.action_distribution %}
+            <div class="bar-list">
+              {% for item in dashboard.action_distribution %}
+              <div class="bar-row">
+                <div class="bar-label">{{ item.label }}</div>
+                <div class="bar-track"><div class="bar-fill violet" style="--bar: {{ item.percent }}%;"></div></div>
+                <div class="bar-value">{{ item.display }}</div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">Kolom rekomendasi RL belum tersedia pada churn scores.</div>
+            {% endif %}
+          </article>
+
+          <article class="panel span-4">
+            <div class="panel-header">
+              <h2 class="panel-title">Tenure Risk</h2>
+              <span class="panel-note">Avg risk</span>
+            </div>
+            {% if dashboard.tenure_risk %}
+            <div class="tenure-grid">
+              {% for item in dashboard.tenure_risk %}
+              <div class="tenure-item">
+                <div class="tenure-column" style="--bar: {{ item.percent }}%;"></div>
+                <div class="tenure-label">{{ item.label }}<br><strong>{{ item.display }}</strong></div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">Tenure data belum tersedia.</div>
+            {% endif %}
+          </article>
+
+          <article class="panel span-12">
+            <div class="panel-header">
+              <h2 class="panel-title">Average ARPU by Segment</h2>
+              <span class="panel-note">Revenue view</span>
+            </div>
+            <div class="bar-list">
+              {% for item in dashboard.revenue_by_segment %}
+              <div class="bar-row">
+                <div class="bar-label">{{ item.label }}</div>
+                <div class="bar-track"><div class="bar-fill green" style="--bar: {{ item.percent }}%;"></div></div>
+                <div class="bar-value">{{ item.display }} / {{ item.customers }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </article>
+
+          <article class="panel span-12">
+            <div class="panel-header">
+              <h2 class="panel-title">Priority At-Risk Customers</h2>
+              <span class="panel-note">Top 10</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer ID</th>
+                    <th>Risk Score</th>
+                    <th>Segment</th>
+                    <th>ARPU</th>
+                    <th>RL Action</th>
+                    <th>Expected Reward</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in dashboard.top_at_risk %}
+                  <tr>
+                    <td>{{ row.customer_id }}</td>
+                    <td><strong>{{ row.score }}</strong></td>
+                    <td>{{ row.segment }}</td>
+                    <td>{{ row.arpu }}</td>
+                    <td><span class="action-pill">{{ row.action }}</span></td>
+                    <td>{{ row.reward }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section id="predictor" class="tab-panel">
+        <div class="page-heading">
+          <div>
+            <h1>Customer Churn Predictor</h1>
+            <p class="heading-copy">Prediksi probabilitas churn untuk satu pelanggan menggunakan inference bundle yang sama.</p>
+          </div>
+        </div>
+
+        {% if prediction_ready %}
+        <div class="predictor-grid">
+          <form id="prediction-form" class="panel">
+            {% for group in grouped_fields %}
+            <section class="field-group">
+              <h2>{{ group.name }}</h2>
+              <div class="field-grid">
+                {% for field in group.fields %}
+                <label>
+                  <span>{{ field.name }}</span>
+                  {% if field.type == "select" %}
+                  <select name="{{ field.name }}">
+                    {% for option in field.options %}
+                    <option value="{{ option }}" {% if option == field.default %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                  </select>
+                  {% else %}
+                  <input type="number" step="{{ field.step }}" name="{{ field.name }}" value="{{ field.default }}">
+                  {% endif %}
+                </label>
+                {% endfor %}
+              </div>
+            </section>
+            {% endfor %}
+            <div class="status" id="status"></div>
+            <button class="primary-button" type="submit">Prediksi Churn</button>
+          </form>
+
+          <aside class="panel">
+            <div class="source-chip">
+              <span>Model</span>
+              <strong>{{ model_name }}</strong>
+            </div>
+            <div class="score" id="score">0.00%</div>
+            <p class="state" id="state">Menunggu input prediksi</p>
+            <div class="meta">
+              <div>Label: <strong id="label">-</strong></div>
+              <div>Probability: <strong id="probability">-</strong></div>
+            </div>
+            <div class="note">{{ note }}</div>
+          </aside>
+        </div>
+        {% else %}
+        <div class="empty-state">{{ predictor_error }}</div>
+        {% endif %}
+      </section>
+    </main>
   </div>
 
   <script>
-    const form = document.getElementById("prediction-form");
-    const statusNode = document.getElementById("status");
-    const scoreNode = document.getElementById("score");
-    const stateNode = document.getElementById("state");
-    const labelNode = document.getElementById("label");
-    const probabilityNode = document.getElementById("probability");
+    const tabButtons = document.querySelectorAll("[data-tab]");
+    const panels = document.querySelectorAll(".tab-panel");
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      statusNode.textContent = "Memproses prediksi...";
-      const payload = { features: {} };
-      const formData = new FormData(form);
-      for (const [key, value] of formData.entries()) {
-        payload.features[key] = value;
-      }
-
-      try {
-        const response = await fetch("/predict", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (!response.ok) {
-          throw new Error("Request gagal diproses.");
-        }
-        const result = await response.json();
-        scoreNode.textContent = `${result.churn_rate_percent.toFixed(2)}%`;
-        stateNode.textContent = result.prediction;
-        labelNode.textContent = result.churn_label;
-        probabilityNode.textContent = result.churn_probability.toFixed(4);
-        statusNode.textContent = "";
-      } catch (error) {
-        statusNode.textContent = "Prediksi gagal. Periksa input lalu coba lagi.";
-      }
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.tab;
+        tabButtons.forEach((item) => item.classList.toggle("active", item === button));
+        panels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
+      });
     });
+
+    const form = document.getElementById("prediction-form");
+    if (form) {
+      const statusNode = document.getElementById("status");
+      const scoreNode = document.getElementById("score");
+      const stateNode = document.getElementById("state");
+      const labelNode = document.getElementById("label");
+      const probabilityNode = document.getElementById("probability");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        statusNode.textContent = "Memproses prediksi...";
+        const payload = { features: {} };
+        const formData = new FormData(form);
+        for (const [key, value] of formData.entries()) {
+          payload.features[key] = value;
+        }
+
+        try {
+          const response = await fetch("/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (!response.ok) {
+            throw new Error("Request gagal diproses.");
+          }
+          const result = await response.json();
+          scoreNode.textContent = `${result.churn_rate_percent.toFixed(2)}%`;
+          stateNode.textContent = result.prediction;
+          labelNode.textContent = result.churn_label;
+          probabilityNode.textContent = result.churn_probability.toFixed(4);
+          statusNode.textContent = "";
+        } catch (error) {
+          statusNode.textContent = "Prediksi gagal. Periksa input lalu coba lagi.";
+        }
+      });
+    }
   </script>
 </body>
 </html>

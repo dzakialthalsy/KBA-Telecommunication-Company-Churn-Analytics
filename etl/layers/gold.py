@@ -32,6 +32,16 @@ CUSTOMER_ID_COL = "Customer_ID"
 HIGH_RISK_THRESHOLD = 0.7
 MEDIUM_RISK_THRESHOLD = 0.4
 HIGH_VALUE_AVGREV_PERCENTILE = 0.75
+RL_SCORE_COLS = [
+    "rl_recommended_action",
+    "rl_expected_reward",
+    "rl_estimated_churn_reduction",
+    "rl_adjusted_churn_score",
+    "rl_action_cost",
+    "rl_policy_confidence",
+    "rl_policy_version",
+    "rl_generated_at",
+]
 
 
 def load_to_gold(duckdb_path: Path, model_scores_path: Path = None) -> dict:
@@ -146,8 +156,11 @@ def _build_churn_risk(df: pd.DataFrame, model_scores_path: Path = None) -> pd.Da
             )
         elif CUSTOMER_ID_COL in df.columns:
             ml_scores = ml_scores.rename(columns={id_col_ml: CUSTOMER_ID_COL})
+            available_score_cols = required_score_cols + [
+                col for col in RL_SCORE_COLS if col in ml_scores.columns
+            ]
             df = df.merge(
-                ml_scores[[CUSTOMER_ID_COL] + required_score_cols],
+                ml_scores[[CUSTOMER_ID_COL] + available_score_cols],
                 on=CUSTOMER_ID_COL,
                 how="left",
             )
@@ -176,7 +189,7 @@ def _build_churn_risk(df: pd.DataFrame, model_scores_path: Path = None) -> pd.Da
         "churn", "avgrev", "change_rev", "custcare_Mean",
         "fe_churn_risk_rule", "ml_churn_score", "ml_churn_label",
         "risk_level", "customer_segment", "risk_updated_at",
-    ] if c in df.columns]
+    ] + RL_SCORE_COLS if c in df.columns]
 
     return df[keep_cols].reset_index(drop=True)
 
@@ -260,7 +273,10 @@ def _build_churn_prediction(df: pd.DataFrame, model_scores_path: Path) -> pd.Dat
         "fe_churn_risk_rule",
     ] if c in df.columns]
 
-    df_pred = ml_scores[[CUSTOMER_ID_COL] + required].merge(
+    available_score_cols = required + [
+        col for col in RL_SCORE_COLS if col in ml_scores.columns
+    ]
+    df_pred = ml_scores[[CUSTOMER_ID_COL] + available_score_cols].merge(
         df[context_cols],
         on=CUSTOMER_ID_COL,
         how="left",
